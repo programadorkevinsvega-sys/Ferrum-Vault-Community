@@ -237,6 +237,7 @@ dependencies = [
  "aws-lc-rs",
  "criterion",
  "serde_json",
+ "zeroize",
 ]
 
 [[package]]

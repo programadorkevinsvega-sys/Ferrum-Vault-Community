@@ -62,6 +62,10 @@ Criterion benchmarks cover encryption and decryption for 64-byte, 1-KiB, 16-KiB 
 
 These are a first CI baseline, not a performance SLO or a controlled cross-provider comparison. The hosted runner is virtualized and Criterion reported outliers in some small-sample cases. Do not compare later measurements unless CPU model, OS, Rust toolchain, provider version, sample interval and benchmark procedure are equivalent.
 
+## Transient buffer handling
+
+The adapter uses `zeroize` 1.9.1 to clear the mutable scratch buffer after successful decryption and after encryption/decryption errors. The plaintext vector returned from `open` is caller-owned and is not wiped by the adapter. This does not replace the later memory-protection / `memguard` work or define the lifecycle of caller-supplied key material.
+
 ## Verification boundary
 
 This phase demonstrates correct provider integration for its selected algorithm/profile. It does not complete the barrier format, canonical AAD encoder, key management, nonce-budget/rotation controls, memory protection, seal lifecycle, KMS integration, storage or independent cryptographic review.

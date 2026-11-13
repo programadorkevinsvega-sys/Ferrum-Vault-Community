@@ -16,7 +16,7 @@ The default non-FIPS AWS-LC build requires a C/C++ compiler. It does not require
 
 ## Implemented boundary
 
-Aes256GcmProvider wraps AWS-LC's randomized-nonce AEAD API. It returns the nonce separately and appends the full 128-bit tag to the ciphertext. Authentication failure returns an error and never returns plaintext. Error messages and provider diagnostics omit key material, plaintext and ciphertext.
+Aes256GcmProvider wraps AWS-LC's randomized-nonce AEAD API. It returns the nonce separately and appends the full 128-bit tag to the ciphertext. Authentication failure returns an error and never returns plaintext. Scratch buffers are zeroized on authentication failure and after a successful plaintext copy; the returned plaintext buffer is caller-owned. Error messages and provider diagnostics omit key material, plaintext and ciphertext.
 
 This is only the Phase 1.1 provider adapter. It does not implement the seal/key hierarchy, canonical AAD encoding, nonce-use accounting, rotation, persistence or barrier lifecycle. Those remain in their assigned Phase 1 subphases. Do not treat this crate alone as the complete storage barrier.
 

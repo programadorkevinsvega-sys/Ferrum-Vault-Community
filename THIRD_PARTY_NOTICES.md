@@ -6,7 +6,7 @@ This file tracks third-party material distributed with or referenced by Ferrum V
 
 - **aws-lc-rs 1.19.0** — exact version pin; source: https://github.com/aws/aws-lc-rs/tree/v1.19.0; upstream package SPDX expression: `ISC AND (Apache-2.0 OR ISC)`.
 - **aws-lc-sys 0.47.0** — the native AWS-LC FFI/build package resolved by the locked non-FIPS feature; source: https://github.com/aws/aws-lc-rs/tree/v1.19.0/aws-lc-sys; upstream package SPDX expression: `ISC AND (Apache-2.0 OR ISC) AND Apache-2.0 AND MIT AND BSD-3-Clause AND (Apache-2.0 OR ISC OR MIT) AND (Apache-2.0 OR ISC OR MIT-0)`.
-- **zeroize 1.9.1** — transitive dependency of aws-lc-rs; SPDX expression: `MIT OR Apache-2.0`.
+- **zeroize 1.9.1** — exact direct dependency used to clear mutable AEAD scratch buffers; source: https://github.com/RustCrypto/utils/tree/zeroize-v1.9.1; SPDX expression: `MIT OR Apache-2.0`.
 - Cargo.lock records registry checksums for these crates and the remaining resolved dependency graph. It is checked by every CI build with `--locked`.
 - The Community crate selects the explicit `non-fips` feature and disables default features. This is not a FIPS validation claim.
 - The upstream non-FIPS build requires a C/C++ compiler. Upstream documentation states that CMake, bindgen and Go are not required for this build path. On Windows, follow AWS-LC's platform-specific assembler guidance when building outside the tested hosted runner.
