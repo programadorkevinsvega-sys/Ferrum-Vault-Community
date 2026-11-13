@@ -1,0 +1,54 @@
+name: Scheduled cryptographic fuzzing
+
+on:
+  schedule:
+    - cron: "19 5 * * 1"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: community-scheduled-crypto-fuzz
+  cancel-in-progress: false
+
+jobs:
+  fuzz:
+    name: Extended crypto fuzz (${{ matrix.target }})
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    strategy:
+      fail-fast: false
+      matrix:
+        target:
+          - seal_open_roundtrip
+          - open_arbitrary_payload
+          - authentication_mutations
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          persist-credentials: false
+
+      - name: Install pinned fuzz toolchain
+        run: rustup toolchain install nightly-2026-11-12 --profile minimal
+
+      - name: Install pinned cargo-fuzz
+        run: cargo +nightly-2026-11-12 install cargo-fuzz --version 0.13.2 --locked
+
+      - name: Verify fuzz workspace lockfile
+        run: cargo +nightly-2026-11-12 metadata --manifest-path fuzz/Cargo.toml --locked --format-version 1
+
+      - name: Run five-minute ${{ matrix.target }} fuzz campaign
+        run: cargo +nightly-2026-11-12 fuzz run ${{ matrix.target }} -- -max_total_time=300 -max_len=65536 -timeout=10
+
+      - name: Retain corpus and crash artifacts
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: crypto-fuzz-${{ matrix.target }}-${{ github.run_id }}
+          path: |
+            fuzz/corpus/${{ matrix.target }}/
+            fuzz/artifacts/${{ matrix.target }}/
+          if-no-files-found: ignore
+          retention-days: 14

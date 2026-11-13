@@ -43,14 +43,41 @@ The test fixture is copied from C2SP Wycheproof testvectors_v1/aes_gcm_test.json
 
 All valid cases must reproduce exact ciphertext and tag and decrypt to the expected plaintext. All invalid cases must fail authentication. Other key sizes, IV lengths and tag profiles are not silently treated as Ferrum's approved profile.
 
+## Boundary, mutation and fuzz testing
+
+In addition to KAT and Wycheproof vectors, the Phase 1.1 adapter has deterministic
+tests for empty input, AES block boundaries, multiple AAD lengths and payloads up
+to 1 MiB. Mutation coverage flips every byte of a representative nonce,
+ciphertext/tag and AAD. Truncated authentication tags, extended envelopes, a wrong
+AAD and a wrong key must fail with AuthenticationFailed; no plaintext is returned.
+
+The isolated fuzz/ workspace contains three coverage-guided libFuzzer targets:
+
+- seal_open_roundtrip checks the seal/open invariant for arbitrary AAD and plaintext.
+- open_arbitrary_payload passes arbitrary AAD, fixed-width nonce contents and
+  malformed ciphertext/tag lengths to open.
+- authentication_mutations mutates each authenticated field and asserts fail-closed
+  behavior.
+
+CI executes a 60-second smoke campaign per target on pull requests and pushes to
+main; a scheduled/manual workflow runs five minutes per target and retains corpus
+and crash artifacts. Inputs are capped at 64 KiB in CI. A clean time-bounded run is
+evidence of exercised fuzzing, not proof of exhaustive coverage or absence of defects.
+A serialized envelope parser does not exist in this subphase; it must get a dedicated
+fuzz target when introduced.
+
+Miri is not used as an oracle for AWS-LC's native AEAD implementation because the
+cryptographic operations cross the native FFI boundary. Miri applicability must be
+reassessed for later pure-Rust components and documented rather than silently omitted.
+
 ## Performance evidence
 
-Criterion benchmarks cover encryption and decryption for 64-byte, 1-KiB, 16-KiB and 1-MiB payloads. The recorded baseline is from the post-merge [CI run #43518675434](https://github.com/programadorkevinsvega-sys/Ferrum-Vault-Community/actions/runs/43518675434), job `Rust provider (linux-x86_64)`, on the merged implementation, including zeroizing scratch buffers:
+Criterion benchmarks cover encryption and decryption for 64-byte, 1-KiB, 16-KiB and 1-MiB payloads. The recorded baseline is from the post-merge [CI run #43518675434](https://github.com/programadorkevinsvega-sys/Ferrum-Vault-Community/actions/runs/43518675434), job Rust provider (linux-x86_64), on the merged implementation, including zeroizing scratch buffers:
 
 - Ubuntu 26.04.1 LTS, Linux x86_64;
 - Intel Xeon Platinum 8370C virtualized runner (4 vCPUs reported);
 - rustc 1.100.0 and Cargo 1.100.0;
-- `aws-lc-rs` 1.19.0, Criterion 0.8.2;
+- aws-lc-rs 1.19.0, Criterion 0.8.2;
 - 10 samples per case, 1-second warm-up and 2-second measurement.
 
 | Payload | Seal estimate | Open estimate |
@@ -64,13 +91,12 @@ Values are Criterion's reported point estimates, not medians. This is an initial
 
 ## Transient buffer handling
 
-The adapter wraps mutable scratch buffers in `zeroize::Zeroizing` 1.9.1, which clears them on both success and error, including unwinding. The plaintext vector returned from `open` is caller-owned and is not wiped by the adapter. This does not replace the later memory-protection / `memguard` work or define the lifecycle of caller-supplied key material.
+The adapter wraps mutable scratch buffers in zeroize::Zeroizing 1.9.1, which clears them on both success and error, including unwinding. The plaintext vector returned from open is caller-owned and is not wiped by the adapter. This does not replace the later memory-protection / memguard work or define the lifecycle of caller-supplied key material.
 
 ## Verification boundary
 
 This phase demonstrates correct provider integration for its selected algorithm/profile. It does not complete the barrier format, canonical AAD encoder, key management, nonce-budget/rotation controls, memory protection, seal lifecycle, KMS integration, storage or independent cryptographic review.
 
-
 ## Secret-scanner false-positive handling
 
-Gitleaks may classify the `key` properties in the vendored Wycheproof JSON as generic API keys. They are fixed public AES-GCM test-vector inputs, not service credentials. The repository configuration permits only lines matching the documented AES key hex lengths in this exact fixture path and only for the `generic-api-key` detector. The default detection rules and scans of every other path remain enabled.
+Gitleaks may classify the key properties in the vendored Wycheproof JSON as generic API keys. They are fixed public AES-GCM test-vector inputs, not service credentials. The repository configuration permits only lines matching the documented AES key hex lengths in this exact fixture path and only for the generic-api-key detector. The default detection rules and scans of every other path remain enabled.
