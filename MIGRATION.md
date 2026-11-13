@@ -1,57 +1,42 @@
-# Community repository migration record
+# Community documentation migration record
 
-## Status
+## Current record
 
-The curated public documentation foundation was merged into `main` through [PR #1](https://github.com/programadorkevinsvega-sys/Ferrum-Vault-Community/pull/1) on 2026-11-13.
+The initial curated documentation snapshot was merged into Community `main` through [PR #1](https://github.com/programadorkevinsvega-sys/Ferrum-Vault-Community/pull/1) on 2026-11-13. Subsequent public documentation and licensing updates were merged separately.
 
-- Destination branch: `main`
-- Initial snapshot merge commit: `184e100448258f0e4acf57e85c906b00bb17c235`
-- Public files in the initial tree: 17
+- Current Community default branch: `main`.
+- This migration record tracks public documentation provenance; it is not a transfer of source Git history.
+- The initial snapshot contained 17 public files. The current repository has grown through reviewed documentation and policy changes.
 
-## Source reference
+## Source baseline reviewed
 
-The private source snapshot reviewed for this migration was `programadorkevinsvega-sys/Ferrum-Vault`, branch `phase-0/foundations`, commit `1fba2e2ab599ee2952a0e7e10a6dba78a66bfb79`.
+The source architecture baseline was `programadorkevinsvega-sys/Ferrum-Vault`, `phase-0/foundations`, commit `1fba2e2ab599ee2952a0e7e10a6dba78a66bfb79`. The source `main` tip `b79b0d4f8111b85370da473615f5a16806047061` was compared with that branch: both trees contained the same 62 tracked file paths and identical file contents.
 
-## Public selection
+The source snapshot is documentation-only. It contains planned crate README placeholders but no Cargo manifests or Rust implementation.
 
-Created or curated for this repository:
-- Public project overview and implementation status.
-- High-level architecture principles and a summary of the Community/Enterprise boundary.
-- Public roadmap without internal work breakdown or sensitive engineering detail.
-- Contribution, security and license-status policies.
-- Public-repository PR/issue templates, CI and complete-history Gitleaks scanning.
-- A generic Markdown link/anchor validation script.
-- Preventive ignore rules for environment files, private keys, keystores, recovery material, nested build outputs and test artifacts.
+## Public ADR carryover
 
-Not copied:
-- Internal ADR collection.
-- Full internal roadmap and phase acceptance criteria.
-- STRIDE threat model, detailed data-protection design, security checklist and internal review procedure.
-- Internal architecture and operational runbooks.
-- Enterprise code or dependencies.
-- Internal CI evidence, false-positive allowlists or source-repository workflow history.
+The initial curated migration intentionally omitted internal ADRs. That left Community without a complete public record of the owner-approved decisions governing its own product.
 
-The source snapshot contains no Rust implementation or Cargo manifests. Empty crate README placeholders were not published as Community implementation. The Community repository remains documentation-only.
+This documentation update corrects that gap:
 
-## License
+- Public Community ADRs 0001–0023 preserve the source decision identifiers and statuses.
+- Each public ADR records its source decision ID and the reviewed baseline commit.
+- Decisions applicable to both editions are adapted to Community scope only.
+- Private-edition implementation detail and owner-only repository administration are not reproduced.
+- The unabridged internal decision records remain in the private engineering repository; this public directory is sufficient to understand and implement the Community edition without consulting private documents.
+- Pending parameters remain explicitly pending. This migration does not approve a numeric AES-GCM rotation threshold, nonce-reservation block size or generate-root quorum.
 
-No `LICENSE` file is present on Community `main`. MPL-2.0 is tracked separately in [PR #4](https://github.com/programadorkevinsvega-sys/Ferrum-Vault-Community/pull/4), which remains open and unmerged at the date of this record. The license proposal and any legal approval are outside this migration acceptance.
+The public records are English-language adaptations for Community, not a transfer of the original ADR files or Git history.
 
-## History
+## Public selection and exclusions
 
-This is a curated documentation snapshot, not a transfer of Git history, branches, tags, pull requests or workflow runs. No tags were present in the source or either destination at the time of comparison.
+Community includes its public product scope, approved interfaces, architecture, security requirements, contribution and release policies, and roadmap. It does not include proprietary implementation, confidential internal material, private runbooks or private-only edition design. No source branches, tags, pull requests, commits or workflow runs were migrated.
 
-## Owner acceptance — 2026-11-13
+## License status
 
-The owner accepted this **Community documentation snapshot only**, after comparing the source repository, Enterprise and Community.
-
-- The accepted Community `main` contains 17 tracked files. It is a public, curated subset, not a copy of the Enterprise tree.
-- Current Community branch-tip trees were checked. No Enterprise ADRs, full STRIDE threat model, internal data-protection documents, operations runbooks, phase acceptance documents or Enterprise crate placeholders were found in those branch tips.
-- The Community `.gitignore` security exclusions were restored from the reviewed source baseline in [PR #6](https://github.com/programadorkevinsvega-sys/Ferrum-Vault-Community/pull/6), merged after CI and Gitleaks passed.
-- The active ruleset `Ferrum Vault Community — Protect main` applies to `refs/heads/main`. It requires a pull request and successful `Public repository quality gates` and `Gitleaks — all fetched Git history and refs` checks, with linear history, squash-only merges, no force-push and no branch deletion. It does not require a human approval.
-
-This acceptance does **not** approve MPL-2.0, trademark clearance, production readiness, a Rust implementation, or transfer of source Git history.
+The [MPL-2.0 license](LICENSE) was added and merged through [PR #4](https://github.com/programadorkevinsvega-sys/Ferrum-Vault-Community/pull/4). It is the operative provisional license declaration for covered Community materials carrying the required notices. “Provisional” means qualified legal review is pending; it does not make the license text non-binding or alter its terms. See [LICENSE-STATUS.md](LICENSE-STATUS.md). No claim is made that legal review is complete.
 
 ## Source repository preservation
 
-The original `programadorkevinsvega-sys/Ferrum-Vault` remains private, active and unarchived. Its `main` branch remains at `74a625ce4aa6c4d5dfba26212c18e5846cb42cf0`; `phase-0/foundations` remains at `1fba2e2ab599ee2952a0e7e10a6dba78a66bfb79`, with source PR #1 still open. The owner has not authorized closing that PR, archiving or deleting the source repository, or transferring its history.
+The original Ferrum-Vault source repository remains private and is not replaced by Community. This migration did not delete, archive, rename or transfer that repository, and it did not transfer its Git history.
