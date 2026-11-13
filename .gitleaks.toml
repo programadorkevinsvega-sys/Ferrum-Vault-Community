@@ -1,0 +1,4 @@
+title = "Ferrum Vault Community secret scanning"
+
+[extend]
+useDefault = true
