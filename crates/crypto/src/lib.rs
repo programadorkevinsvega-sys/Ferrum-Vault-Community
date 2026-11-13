@@ -9,7 +9,7 @@
 
 use std::fmt;
 
-use aws_lc_rs::aead::{Aad, AES_256_GCM, NONCE_LEN, Nonce, RandomizedNonceKey};
+use aws_lc_rs::aead::{AES_256_GCM, Aad, NONCE_LEN, Nonce, RandomizedNonceKey};
 
 /// Exact cryptographic provider selected by the owner-approved ADR-0013.
 pub const CRYPTO_PROVIDER_VERSION: &str = "aws-lc-rs/1.19.0";
@@ -96,11 +96,7 @@ impl Aes256GcmProvider {
     /// Authenticates and decrypts a payload using its original nonce and AAD.
     ///
     /// No plaintext is returned unless AWS-LC verifies the authentication tag.
-    pub fn open(
-        &self,
-        aad: &[u8],
-        payload: &SealedPayload,
-    ) -> Result<Vec<u8>, CryptoError> {
+    pub fn open(&self, aad: &[u8], payload: &SealedPayload) -> Result<Vec<u8>, CryptoError> {
         let nonce = Nonce::assume_unique_for_key(payload.nonce);
         let mut ciphertext_and_tag = payload.ciphertext_and_tag.clone();
         let plaintext = self
@@ -125,7 +121,7 @@ pub struct SealedPayload {
 
 #[cfg(test)]
 mod tests {
-    use super::{Aes256GcmProvider, CryptoError, CRYPTO_PROVIDER_VERSION};
+    use super::{Aes256GcmProvider, CRYPTO_PROVIDER_VERSION, CryptoError};
 
     #[test]
     fn provider_round_trips_with_random_96_bit_nonces() {

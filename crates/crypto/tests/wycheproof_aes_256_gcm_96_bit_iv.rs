@@ -1,9 +1,9 @@
 mod support;
 
-use aws_lc_rs::aead::{Aad, BoundKey, OpeningKey, SealingKey, UnboundKey, AES_256_GCM};
+use aws_lc_rs::aead::{AES_256_GCM, Aad, BoundKey, OpeningKey, SealingKey, UnboundKey};
 use serde_json::Value;
 
-use support::{decode_hex, FixedNonce};
+use support::{FixedNonce, decode_hex};
 
 const WYCHEPROOF_VECTORS: &str = include_str!("vectors/aes_gcm_test.json");
 
@@ -99,5 +99,8 @@ fn wycheproof_aes_256_gcm_96_bit_iv_profile() {
 
     assert_eq!(matching_groups, 1, "one approved AES-256-GCM profile");
     assert_eq!(valid_cases, 39, "all valid profile vectors were exercised");
-    assert_eq!(invalid_cases, 27, "all invalid profile vectors were rejected");
+    assert_eq!(
+        invalid_cases, 27,
+        "all invalid profile vectors were rejected"
+    );
 }

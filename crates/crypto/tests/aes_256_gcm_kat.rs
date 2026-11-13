@@ -1,8 +1,8 @@
 mod support;
 
-use aws_lc_rs::aead::{Aad, BoundKey, OpeningKey, SealingKey, UnboundKey, AES_256_GCM};
+use aws_lc_rs::aead::{AES_256_GCM, Aad, BoundKey, OpeningKey, SealingKey, UnboundKey};
 
-use support::{decode_hex, FixedNonce};
+use support::{FixedNonce, decode_hex};
 
 fn assert_aes_256_gcm_kat(
     key_hex: &str,
