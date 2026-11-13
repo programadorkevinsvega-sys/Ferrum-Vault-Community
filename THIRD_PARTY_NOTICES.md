@@ -4,10 +4,13 @@ This file tracks third-party material distributed with or referenced by Ferrum V
 
 ## Cryptographic runtime dependency
 
-- **aws-lc-rs 1.19.0** — exact version pin; source: https://github.com/aws/aws-lc-rs/tree/v1.19.0; upstream package SPDX expression: ISC AND (Apache-2.0 OR ISC).
-- AWS-LC is brought in through the upstream aws-lc-sys dependency. Cargo.lock records resolved native wrapper and transitive package versions and checksums.
-- The Community crate selects the explicit non-fips feature. This is not a FIPS validation claim.
-- The upstream non-FIPS build requires a C/C++ compiler. Upstream documentation says CMake, bindgen and Go are not required for this build path.
+- **aws-lc-rs 1.19.0** — exact version pin; source: https://github.com/aws/aws-lc-rs/tree/v1.19.0; upstream package SPDX expression: `ISC AND (Apache-2.0 OR ISC)`.
+- **aws-lc-sys 0.47.0** — the native AWS-LC FFI/build package resolved by the locked non-FIPS feature; source: https://github.com/aws/aws-lc-rs/tree/v1.19.0/aws-lc-sys; upstream package SPDX expression: `ISC AND (Apache-2.0 OR ISC) AND Apache-2.0 AND MIT AND BSD-3-Clause AND (Apache-2.0 OR ISC OR MIT) AND (Apache-2.0 OR ISC OR MIT-0)`.
+- **zeroize 1.9.1** — transitive dependency of aws-lc-rs; SPDX expression: `MIT OR Apache-2.0`.
+- Cargo.lock records registry checksums for these crates and the remaining resolved dependency graph. It is checked by every CI build with `--locked`.
+- The Community crate selects the explicit `non-fips` feature and disables default features. This is not a FIPS validation claim.
+- The upstream non-FIPS build requires a C/C++ compiler. Upstream documentation states that CMake, bindgen and Go are not required for this build path. On Windows, follow AWS-LC's platform-specific assembler guidance when building outside the tested hosted runner.
+
 
 ## Cryptographic test vectors
 
@@ -15,9 +18,11 @@ This file tracks third-party material distributed with or referenced by Ferrum V
 - The fixture is reproduced at crates/crypto/tests/vectors/aes_gcm_test.json. The applicable AES-256-GCM profile is filtered by key size 256 bits, IV size 96 bits and tag size 128 bits.
 - Wycheproof test data is distributed under Apache License 2.0. The exact upstream license text is retained at crates/crypto/tests/vectors/LICENSE-APACHE-2.0.txt.
 
-## Benchmark dependency
+## Development and test dependencies
 
-- **Criterion 0.8.2** — development-only benchmarking dependency, source: https://github.com/criterion-rs/criterion.rs; dual-licensed under Apache-2.0 and MIT. It is not included as a runtime dependency.
+- **Criterion 0.8.2** — benchmark-only dependency; source: https://github.com/criterion-rs/criterion.rs; SPDX expression: `Apache-2.0 OR MIT`.
+- **serde_json 1.0.154** — test-only JSON parser for the Wycheproof corpus; SPDX expression: `MIT OR Apache-2.0`.
+- These dependencies are not part of the runtime dependency surface. Exact versions and registry checksums are recorded in Cargo.lock.
 
 ## Initial Community foundation snapshot
 
