@@ -13,7 +13,7 @@ This implementation follows owner-approved ADR-0013 without changing it:
 
 ## Maintenance and upstream review
 
-The selected release is the current upstream release used for this implementation. The upstream Rust wrapper repository is actively maintained and publishes versioned releases. The exact selected source is the v1.19.0 tag in aws/aws-lc-rs.
+At selection time, v1.19.0 was the current upstream release used for this implementation. The upstream Rust wrapper repository is actively maintained and publishes versioned releases. The exact selected source is the v1.19.0 tag in aws/aws-lc-rs.
 
 The upstream package manifest declares ISC AND (Apache-2.0 OR ISC). Its non-FIPS build requires a C/C++ compiler; upstream documentation states that CMake, bindgen and Go are not required for the default non-FIPS path. The integration intentionally disables default features and opts into non-fips only.
 
@@ -43,9 +43,24 @@ The test fixture is copied from C2SP Wycheproof testvectors_v1/aes_gcm_test.json
 
 All valid cases must reproduce exact ciphertext and tag and decrypt to the expected plaintext. All invalid cases must fail authentication. Other key sizes, IV lengths and tag profiles are not silently treated as Ferrum's approved profile.
 
-## Performance evaluation
+## Performance evidence
 
-Criterion benchmarks cover encryption and decryption for 64-byte, 1-KiB, 16-KiB and 1-MiB payloads. The baseline is provider-specific and runner-dependent. Do not convert hosted-runner timings into a hard performance SLO. For comparative performance claims, record CPU model, OS, Rust toolchain, provider version, sample interval and benchmark artifact, and compare against the same controlled environment.
+Criterion benchmarks cover encryption and decryption for 64-byte, 1-KiB, 16-KiB and 1-MiB payloads. The CI baseline was collected in [run #43514313669](https://github.com/programadorkevinsvega-sys/Ferrum-Vault-Community/actions/runs/43514313669), job `Rust provider (linux-x86_64)`, using:
+
+- Ubuntu 26.04.1 LTS, Linux x86_64;
+- Intel Xeon Platinum 8573C virtualized runner (4 vCPUs reported);
+- rustc 1.100.0 and Cargo 1.100.0;
+- `aws-lc-rs` 1.19.0, Criterion 0.8.2;
+- 10 samples per case, 1-second warm-up and 2-second measurement.
+
+| Payload | Seal median | Open median |
+|---:|---:|---:|
+| 64 B | 619.92 ns | 130.10 ns |
+| 1 KiB | 773.73 ns | 275.44 ns |
+| 16 KiB | 2.1770 µs | 1.9108 µs |
+| 1 MiB | 125.47 µs | 189.66 µs |
+
+These are a first CI baseline, not a performance SLO or a controlled cross-provider comparison. The hosted runner is virtualized and Criterion reported outliers in some small-sample cases. Do not compare later measurements unless CPU model, OS, Rust toolchain, provider version, sample interval and benchmark procedure are equivalent.
 
 ## Verification boundary
 
