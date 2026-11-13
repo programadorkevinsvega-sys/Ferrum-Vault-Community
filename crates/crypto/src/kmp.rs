@@ -404,11 +404,9 @@ mod tests {
         assert!(KeyContext::new(KeyPurpose::SealRoot, b"").is_err());
     }
 
-
     #[test]
     fn context_encoding_matches_the_fvc1_golden_vector() {
-        let context =
-            KeyContext::new(KeyPurpose::DataEncryptionKey, b"keys/app/primary").unwrap();
+        let context = KeyContext::new(KeyPurpose::DataEncryptionKey, b"keys/app/primary").unwrap();
         let expected =
             b"FVC1\x00\x01\x00\x00\x00\x04root\x00\x00\x00\x13data-encryption-key\x00\x00\x00\x10keys/app/primary";
         assert_eq!(context.as_bytes(), expected);
@@ -422,7 +420,6 @@ mod tests {
         assert_eq!(decoded, envelope);
         assert_eq!(decoded.encode(), encoded);
     }
-
 
     #[test]
     fn fvk1_encoding_and_decoding_match_the_golden_vector() {

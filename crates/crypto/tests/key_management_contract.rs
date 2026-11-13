@@ -201,15 +201,13 @@ fn every_context_scope_byte_is_authenticated() {
     }
 }
 
-
 #[test]
 fn key_purpose_is_part_of_the_authenticated_context() {
     let provider = TestProvider::new();
     let key_id = KeyId::new("test/local-kek").unwrap();
     let original_context =
         KeyContext::new(KeyPurpose::DataEncryptionKey, b"keys/application/primary").unwrap();
-    let wrapped =
-        run_ready(provider.wrap(&key_id, &[0x66; 32], &original_context)).unwrap();
+    let wrapped = run_ready(provider.wrap(&key_id, &[0x66; 32], &original_context)).unwrap();
 
     let changed_purpose =
         KeyContext::new(KeyPurpose::KeyringKey, b"keys/application/primary").unwrap();
