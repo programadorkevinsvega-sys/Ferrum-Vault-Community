@@ -1,18 +1,100 @@
 name: CI
+
 on:
   pull_request:
     branches: [main]
   push:
     branches: [main]
   workflow_dispatch:
+
 permissions:
   contents: read
+
 concurrency:
   group: community-ci-${{ github.ref }}
   cancel-in-progress: false
+
 jobs:
+  rust:
+    name: Rust provider (${{ matrix.target }})
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 45
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: ubuntu-latest
+            target: linux-x86_64
+          - os: ubuntu-24.04-arm
+            target: linux-aarch64
+          - os: macos-latest
+            target: macos
+          - os: windows-latest
+            target: windows
+    steps:
+      - name: Check out repository history
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Install pinned Rust toolchain
+        shell: bash
+        run: |
+          rustup toolchain install 1.100.0 --profile minimal --component rustfmt --component clippy
+          rustc +1.100.0 --version
+
+      # Bootstrap only: replace this step with --locked after the generated
+      # Cargo.lock is committed to the repository.
+      - name: Generate initial lockfile
+        shell: bash
+        run: cargo +1.100.0 generate-lockfile
+
+      - name: Check formatting
+        run: cargo +1.100.0 fmt --all -- --check
+
+      - name: Run unit, integration and benchmark-build tests
+        run: cargo +1.100.0 test --workspace --all-targets
+
+      - name: Run Clippy with warnings denied
+        run: cargo +1.100.0 clippy --workspace --all-targets -- -D warnings
+
+      - name: Benchmark AES-256-GCM provider
+        if: matrix.target == 'linux-x86_64'
+        run: cargo +1.100.0 bench --bench aes_256_gcm -- --sample-size 10 --warm-up-time 1 --measurement-time 2
+
+      - name: Emit initial Cargo.lock for bootstrap
+        if: matrix.target == 'linux-x86_64'
+        shell: bash
+        run: |
+          echo "CARGO_LOCK_BOOTSTRAP_BEGIN"
+          cat Cargo.lock
+          echo "CARGO_LOCK_BOOTSTRAP_END"
+
+  msrv:
+    name: MSRV (Rust 1.98.0)
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - name: Check out repository history
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Install minimum supported Rust toolchain
+        run: rustup toolchain install 1.98.0 --profile minimal
+
+      # Bootstrap only: replace with --locked when Cargo.lock is committed.
+      - name: Generate initial lockfile
+        run: cargo +1.98.0 generate-lockfile
+
+      - name: Test minimum supported Rust version
+        run: cargo +1.98.0 test --workspace --all-targets
+
   quality:
     name: Public repository quality gates
+    needs: [rust, msrv]
     runs-on: ubuntu-latest
     timeout-minutes: 10
     steps:

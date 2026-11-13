@@ -6,5 +6,9 @@ updates:
       interval: weekly
     commit-message:
       prefix: chore(deps)
-
-# Re-enable the Cargo ecosystem when Cargo.toml manifests are introduced.
+  - package-ecosystem: cargo
+    directory: /
+    schedule:
+      interval: weekly
+    commit-message:
+      prefix: chore(deps)
