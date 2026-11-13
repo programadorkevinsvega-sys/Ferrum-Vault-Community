@@ -410,7 +410,7 @@ mod tests {
         let context =
             KeyContext::new(KeyPurpose::DataEncryptionKey, b"keys/app/primary").unwrap();
         let expected =
-            b"FVC1\\x00\\x01\\x00\\x00\\x00\\x04root\\x00\\x00\\x00\\x13data-encryption-key\\x00\\x00\\x00\\x10keys/app/primary";
+            b"FVC1\x00\x01\x00\x00\x00\x04root\x00\x00\x00\x13data-encryption-key\x00\x00\x00\x10keys/app/primary";
         assert_eq!(context.as_bytes(), expected);
     }
 
@@ -428,7 +428,7 @@ mod tests {
     fn fvk1_encoding_and_decoding_match_the_golden_vector() {
         let envelope = sample_envelope();
         let mut expected =
-            b"FVK1\\x00\\x01\\x00\\x14community/keyring-v1\\x00\\x00\\x00\\x00\\x00\\x00\\x00\\x07\\x00\\x0bAES-256-GCM\\x00\\x00\\x000"
+            b"FVK1\x00\x01\x00\x14community/keyring-v1\x00\x00\x00\x00\x00\x00\x00\x07\x00\x0bAES-256-GCM\x00\x00\x000"
                 .to_vec();
         expected.extend_from_slice(&[0xA5; 48]);
 
