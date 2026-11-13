@@ -50,6 +50,7 @@ jobs:
         shell: bash
         run: cargo +1.100.0 generate-lockfile
 
+
       - name: Check formatting
         run: cargo +1.100.0 fmt --all -- --check
 
