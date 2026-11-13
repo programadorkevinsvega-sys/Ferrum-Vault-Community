@@ -103,7 +103,7 @@ impl Aes256GcmProvider {
     pub fn open(&self, aad: &[u8], payload: &SealedPayload) -> Result<Vec<u8>, CryptoError> {
         let nonce = Nonce::assume_unique_for_key(payload.nonce);
         let mut scratch = Zeroizing::new(payload.ciphertext_and_tag.clone());
-        match self.key.open_in_place(nonce, Aad::from(aad), &mut *scratch) {
+        match self.key.open_in_place(nonce, Aad::from(aad), &mut scratch) {
             Ok(plaintext) => Ok(plaintext.to_vec()),
             Err(_) => Err(CryptoError::AuthenticationFailed),
         }
