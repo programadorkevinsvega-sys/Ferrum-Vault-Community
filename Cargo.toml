@@ -1,0 +1,15 @@
+[workspace]
+members = ["crates/crypto"]
+resolver = "3"
+
+[workspace.package]
+edition = "2024"
+license = "MPL-2.0"
+rust-version = "1.98"
+repository = "https://github.com/programadorkevinsvega-sys/Ferrum-Vault-Community"
+
+[workspace.dependencies]
+aws-lc-rs = { version = "=1.19.0", default-features = false, features = ["non-fips"] }
+criterion = "=0.8.2"
+serde_json = "1"
+zeroize = "=1.9.1"

@@ -6,7 +6,7 @@ This roadmap describes the public Community edition. It records approved design 
 
 **Phase 0 — Foundations: documentation baseline in progress.** The repository is documentation-only: it has no Cargo workspace, Rust runtime, server or CLI. The public architecture decisions have been carried over into [Community ADRs](docs/adr/README.md). Phase 0 remains open until its remaining Definition of Done and owner acceptance are recorded.
 
-**Phase 1 — Seal and encrypted storage: design approved; implementation not yet recorded as started or complete.** Its approved design inputs are in public ADRs 0001–0004 and 0013–0014. The implementation must follow the phase gates below and must not guess the explicitly pending parameters.
+**Phase 1 — Seal and encrypted storage: implementation in progress.** Subphase 1.1 (cryptographic provider and test vectors) is implemented and CI-verified in [PR #10](https://github.com/programadorkevinsvega-sys/Ferrum-Vault-Community/pull/10). Subphases 1.2–1.7 remain pending. The approved design inputs are in public ADRs 0001–0004 and 0013–0014. The implementation must follow the phase gates below and must not guess explicitly pending parameters.
 
 ## Phase overview
 
@@ -31,6 +31,10 @@ Phases are sequential. A later phase does not begin until the active phase's Def
 Use aws-lc-rs as primary provider and RustCrypto only for missing primitives. Add KAT and applicable Wycheproof vectors, including negative tests.
 
 **Definition of Done:** provider integration and version are documented; KAT/Wycheproof and invalid-tag/AAD tests pass. Library choice alone is not a FIPS validation.
+
+**Implementation status — complete for subphase 1.1:** [PR #10](https://github.com/programadorkevinsvega-sys/Ferrum-Vault-Community/pull/10) integrates the approved AWS-LC provider and records the fixture provenance. [CI run #43514313669](https://github.com/programadorkevinsvega-sys/Ferrum-Vault-Community/actions/runs/43514313669) passed on 2026-11-13: Linux x86_64, Linux aarch64, macOS, Windows, Rust 1.98 MSRV, public quality gates and Gitleaks. The suite executes two AES-256-GCM KAT cases, all 66 Wycheproof vectors for the approved AES-256 / 96-bit IV / 128-bit tag profile (39 valid, 27 invalid), plus AAD/tag tamper tests.
+
+Provider implementation and boundaries are documented in [the crypto crate](crates/crypto/README.md), [provider selection and evidence](docs/security/crypto-provider-selection.md), and [third-party notices](THIRD_PARTY_NOTICES.md). This closes 1.1 only; it does not complete the storage barrier, key-management contract, nonce-use budget, rotation, seal lifecycle or any other Phase 1 subphase.
 
 ### 1.2 Key-management provider contract
 Implement the approved `wrap(key_id, plaintext, context)` and `unwrap(wrapped, context)` interface with typed errors and stable authenticated context.

@@ -1,0 +1,21 @@
+[package]
+name = "ferrum-crypto"
+version = "0.1.0"
+description = "Approved cryptographic provider boundary for Ferrum Community"
+edition.workspace = true
+license.workspace = true
+rust-version.workspace = true
+repository.workspace = true
+publish = false
+
+[dependencies]
+aws-lc-rs.workspace = true
+zeroize.workspace = true
+
+[dev-dependencies]
+criterion.workspace = true
+serde_json.workspace = true
+
+[[bench]]
+name = "aes_256_gcm"
+harness = false

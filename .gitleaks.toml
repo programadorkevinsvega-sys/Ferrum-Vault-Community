@@ -2,3 +2,14 @@ title = "Ferrum Vault Community secret scanning"
 
 [extend]
 useDefault = true
+
+# Wycheproof publishes fixed AES-GCM test keys as public known-answer material.
+# Restrict this exception to the exact vendored corpus, the JSON "key" field,
+# valid AES key hex lengths, and the generic-api-key detector. All other rules
+# and all other files remain scanned.
+[[allowlists]]
+description = "Public C2SP Wycheproof AES-GCM vector keys; not credentials"
+targetRules = ["generic-api-key"]
+paths = ['''^crates/crypto/tests/vectors/aes_gcm_test\.json$''']
+regexTarget = "line"
+regexes = ['''^\s*"key":\s*"([0-9a-f]{32}|[0-9a-f]{48}|[0-9a-f]{64})",?$''']
