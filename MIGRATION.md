@@ -2,7 +2,11 @@
 
 ## Status
 
-A curated public documentation foundation is staged on branch `migration/community-public-foundation`.
+The curated public documentation foundation was merged into `main` through [PR #1](https://github.com/programadorkevinsvega-sys/Ferrum-Vault-Community/pull/1) on 2026-11-13.
+
+- Destination branch: `main`
+- Destination merge commit: `184e100448258f0e4acf57e85c906b00bb17c235`
+- Public files in the initial tree: 17
 
 ## Source reference
 
@@ -34,4 +38,4 @@ No license file was added. MPL-2.0 remains subject to legal review and explicit 
 
 ## History
 
-This is a curated documentation snapshot, not a transfer of Git history, branches, tags, pull requests or workflow runs. The legacy private source repository remains active and unchanged until migration acceptance.
+This is a curated documentation snapshot, not a transfer of Git history, branches, tags, pull requests or workflow runs. The legacy private source repository remains active and unchanged until the owner accepts the complete migration.
