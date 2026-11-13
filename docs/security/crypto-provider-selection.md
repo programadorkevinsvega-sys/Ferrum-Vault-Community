@@ -64,7 +64,7 @@ These are a first CI baseline, not a performance SLO or a controlled cross-provi
 
 ## Transient buffer handling
 
-The adapter uses `zeroize` 1.9.1 to clear the mutable scratch buffer after successful decryption and after encryption/decryption errors. The plaintext vector returned from `open` is caller-owned and is not wiped by the adapter. This does not replace the later memory-protection / `memguard` work or define the lifecycle of caller-supplied key material.
+The adapter wraps mutable scratch buffers in `zeroize::Zeroizing` 1.9.1, which clears them on both success and error, including unwinding. The plaintext vector returned from `open` is caller-owned and is not wiped by the adapter. This does not replace the later memory-protection / `memguard` work or define the lifecycle of caller-supplied key material.
 
 ## Verification boundary
 

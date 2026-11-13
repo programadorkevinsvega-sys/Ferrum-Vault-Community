@@ -10,7 +10,7 @@
 use std::fmt;
 
 use aws_lc_rs::aead::{AES_256_GCM, Aad, NONCE_LEN, Nonce, RandomizedNonceKey};
-use zeroize::Zeroize;
+use zeroize::Zeroizing;
 
 /// Exact cryptographic provider selected by the owner-approved ADR-0013.
 pub const CRYPTO_PROVIDER_VERSION: &str = "aws-lc-rs/1.19.0";
@@ -79,21 +79,18 @@ impl Aes256GcmProvider {
     /// nonce separately and stores the 128-bit authentication tag appended to
     /// the ciphertext.
     pub fn seal(&self, aad: &[u8], plaintext: &[u8]) -> Result<SealedPayload, CryptoError> {
-        let mut ciphertext_and_tag = plaintext.to_vec();
-        let nonce = match self
+        let mut scratch = Zeroizing::new(plaintext.to_vec());
+        let nonce = self
             .key
-            .seal_in_place_append_tag(Aad::from(aad), &mut ciphertext_and_tag)
-        {
-            Ok(nonce) => nonce,
-            Err(_) => {
-                ciphertext_and_tag.zeroize();
-                return Err(CryptoError::EncryptionFailed);
-            }
-        };
+            .seal_in_place_append_tag(Aad::from(aad), &mut *scratch)
+            .map_err(|_| CryptoError::EncryptionFailed)?;
 
         let mut nonce_bytes = [0_u8; NONCE_LEN];
         nonce_bytes.copy_from_slice(nonce.as_ref().as_slice());
 
+        // Move only the ciphertext out. The guard zeroizes any remaining
+        // scratch buffer automatically, including on early return or unwind.
+        let ciphertext_and_tag = std::mem::take(&mut *scratch);
         Ok(SealedPayload {
             nonce: nonce_bytes,
             ciphertext_and_tag,
@@ -105,19 +102,11 @@ impl Aes256GcmProvider {
     /// No plaintext is returned unless AWS-LC verifies the authentication tag.
     pub fn open(&self, aad: &[u8], payload: &SealedPayload) -> Result<Vec<u8>, CryptoError> {
         let nonce = Nonce::assume_unique_for_key(payload.nonce);
-        let mut ciphertext_and_tag = payload.ciphertext_and_tag.clone();
-        let plaintext = match self
-            .key
-            .open_in_place(nonce, Aad::from(aad), &mut ciphertext_and_tag)
-        {
+        let mut scratch = Zeroizing::new(payload.ciphertext_and_tag.clone());
+        match self.key.open_in_place(nonce, Aad::from(aad), &mut *scratch) {
             Ok(plaintext) => Ok(plaintext.to_vec()),
             Err(_) => Err(CryptoError::AuthenticationFailed),
-        };
-
-        // Clear the scratch allocation on both success and failure before it
-        // is dropped. The returned plaintext is caller-owned.
-        ciphertext_and_tag.zeroize();
-        plaintext
+        }
     }
 }
 
