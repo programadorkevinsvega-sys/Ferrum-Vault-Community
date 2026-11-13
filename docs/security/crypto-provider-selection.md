@@ -45,22 +45,22 @@ All valid cases must reproduce exact ciphertext and tag and decrypt to the expec
 
 ## Performance evidence
 
-Criterion benchmarks cover encryption and decryption for 64-byte, 1-KiB, 16-KiB and 1-MiB payloads. The CI baseline was collected in [run #43514313669](https://github.com/programadorkevinsvega-sys/Ferrum-Vault-Community/actions/runs/43514313669), job `Rust provider (linux-x86_64)`, using:
+Criterion benchmarks cover encryption and decryption for 64-byte, 1-KiB, 16-KiB and 1-MiB payloads. The recorded baseline is from the post-merge [CI run #43518675434](https://github.com/programadorkevinsvega-sys/Ferrum-Vault-Community/actions/runs/43518675434), job `Rust provider (linux-x86_64)`, on the merged implementation, including zeroizing scratch buffers:
 
 - Ubuntu 26.04.1 LTS, Linux x86_64;
-- Intel Xeon Platinum 8573C virtualized runner (4 vCPUs reported);
+- Intel Xeon Platinum 8370C virtualized runner (4 vCPUs reported);
 - rustc 1.100.0 and Cargo 1.100.0;
 - `aws-lc-rs` 1.19.0, Criterion 0.8.2;
 - 10 samples per case, 1-second warm-up and 2-second measurement.
 
-| Payload | Seal median | Open median |
+| Payload | Seal estimate | Open estimate |
 |---:|---:|---:|
-| 64 B | 619.92 ns | 130.10 ns |
-| 1 KiB | 773.73 ns | 275.44 ns |
-| 16 KiB | 2.1770 µs | 1.9108 µs |
-| 1 MiB | 125.47 µs | 189.66 µs |
+| 64 B | 636.76 ns | 167.52 ns |
+| 1 KiB | 795.98 ns | 499.80 ns |
+| 16 KiB | 2.2729 µs | 4.6440 µs |
+| 1 MiB | 142.68 µs | 386.43 µs |
 
-These are a first CI baseline, not a performance SLO or a controlled cross-provider comparison. The hosted runner is virtualized and Criterion reported outliers in some small-sample cases. Do not compare later measurements unless CPU model, OS, Rust toolchain, provider version, sample interval and benchmark procedure are equivalent.
+Values are Criterion's reported point estimates, not medians. This is an initial CI baseline, not a performance SLO or controlled cross-provider comparison. The hosted runner is virtualized and small-sample measurements can be noisy. Do not compare later measurements unless CPU model, OS, Rust toolchain, provider version, sample interval and benchmark procedure are equivalent.
 
 ## Transient buffer handling
 
