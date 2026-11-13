@@ -160,7 +160,9 @@ fn wrap_unwrap_authenticates_the_exact_context() {
     assert_eq!(wrapped.key_version(), 7);
     assert_eq!(wrapped.algorithm().as_str(), "AES-256-GCM");
     assert_eq!(
-        run_ready(provider.unwrap(&wrapped, &context)).unwrap().as_slice(),
+        run_ready(provider.unwrap(&wrapped, &context))
+            .unwrap()
+            .as_slice(),
         plaintext
     );
 
@@ -195,11 +197,7 @@ fn every_context_scope_byte_is_authenticated() {
 fn envelope_metadata_is_cryptographically_bound() {
     let provider = TestProvider::new();
     let context = key_context(b"keys/application/primary");
-    let wrapped = run_ready(provider.wrap(
-        &provider.key_id,
-        &[0x33; 32],
-        &context,
-    )).unwrap();
+    let wrapped = run_ready(provider.wrap(&provider.key_id, &[0x33; 32], &context)).unwrap();
 
     let alias = KeyId::new("test/key-alias").unwrap();
     let redirected = WrappedKey::new(
@@ -207,7 +205,8 @@ fn envelope_metadata_is_cryptographically_bound() {
         wrapped.key_version(),
         wrapped.algorithm().clone(),
         wrapped.ciphertext().to_vec(),
-    ).unwrap();
+    )
+    .unwrap();
     assert_eq!(
         run_ready(provider.unwrap(&redirected, &context)),
         Err(KeyManagementError::AuthenticationFailed)
@@ -226,8 +225,12 @@ fn provider_metadata_failures_are_typed_and_fail_closed() {
 
     let wrapped = run_ready(provider.wrap(&provider.key_id, &[0x33; 32], &context)).unwrap();
     let wrong_version = WrappedKey::new(
-        wrapped.key_id().clone(), 8, wrapped.algorithm().clone(), wrapped.ciphertext().to_vec(),
-    ).unwrap();
+        wrapped.key_id().clone(),
+        8,
+        wrapped.algorithm().clone(),
+        wrapped.ciphertext().to_vec(),
+    )
+    .unwrap();
     assert_eq!(
         run_ready(provider.unwrap(&wrong_version, &context)),
         Err(KeyManagementError::KeyVersionUnavailable)
@@ -238,7 +241,8 @@ fn provider_metadata_failures_are_typed_and_fail_closed() {
         wrapped.key_version(),
         AlgorithmId::new("provider/unknown").unwrap(),
         wrapped.ciphertext().to_vec(),
-    ).unwrap();
+    )
+    .unwrap();
     assert_eq!(
         run_ready(provider.unwrap(&wrong_algorithm, &context)),
         Err(KeyManagementError::UnsupportedAlgorithm)
@@ -256,8 +260,12 @@ fn malformed_ciphertext_and_empty_plaintext_are_rejected() {
     );
 
     let malformed = WrappedKey::new(
-        key_id, 7, AlgorithmId::new("AES-256-GCM").unwrap(), vec![0; 12],
-    ).unwrap();
+        key_id,
+        7,
+        AlgorithmId::new("AES-256-GCM").unwrap(),
+        vec![0; 12],
+    )
+    .unwrap();
     assert_eq!(
         run_ready(provider.unwrap(&malformed, &context)),
         Err(KeyManagementError::InvalidWrappedKey)
@@ -272,14 +280,17 @@ fn tampered_wrapped_ciphertext_never_releases_plaintext() {
     let mut ciphertext = wrapped.ciphertext().to_vec();
     *ciphertext.last_mut().unwrap() ^= 0x80;
     let tampered = WrappedKey::new(
-        wrapped.key_id().clone(), wrapped.key_version(), wrapped.algorithm().clone(), ciphertext,
-    ).unwrap();
+        wrapped.key_id().clone(),
+        wrapped.key_version(),
+        wrapped.algorithm().clone(),
+        ciphertext,
+    )
+    .unwrap();
     assert_eq!(
         run_ready(provider.unwrap(&tampered, &context)),
         Err(KeyManagementError::AuthenticationFailed)
     );
 }
-
 
 struct InjectedFailureProvider(KeyManagementError);
 
@@ -312,7 +323,8 @@ fn provider_unavailability_and_internal_failures_are_injected_and_propagated() {
         7,
         AlgorithmId::new("AES-256-GCM").unwrap(),
         vec![0x01; 16],
-    ).unwrap();
+    )
+    .unwrap();
 
     for failure in [
         KeyManagementError::ProviderUnavailable,
