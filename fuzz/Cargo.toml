@@ -33,6 +33,20 @@ test = false
 doc = false
 bench = false
 
+[[bin]]
+name = "wrapped_key_decode"
+path = "fuzz_targets/wrapped_key_decode.rs"
+test = false
+doc = false
+bench = false
+
+[[bin]]
+name = "key_context_mutations"
+path = "fuzz_targets/key_context_mutations.rs"
+test = false
+doc = false
+bench = false
+
 [workspace]
 members = []
 resolver = "3"

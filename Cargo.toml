@@ -9,6 +9,7 @@ rust-version = "1.98"
 repository = "https://github.com/programadorkevinsvega-sys/Ferrum-Vault-Community"
 
 [workspace.dependencies]
+async-trait = "=0.1.89"
 aws-lc-rs = { version = "=1.19.0", default-features = false, features = ["non-fips"] }
 criterion = "=0.8.2"
 serde_json = "1"

@@ -2,6 +2,8 @@
 
 **Phase 1.1 implementation scope:** approved provider selection and AES-256-GCM primitive validation.
 
+**Phase 1.2 implementation scope:** asynchronous, object-safe key-management provider contract, stable authenticated context and canonical wrapped-key envelope encoding. No cloud KMS adapter is included.
+
 ## Provider decision
 
 - Primary provider: aws-lc-rs 1.19.0, pinned exactly.
@@ -12,28 +14,27 @@
 - No RustCrypto fallback is included because AES-256-GCM is available in the approved primary provider.
 - No FIPS claim is made.
 
-The default non-FIPS AWS-LC build requires a C/C++ compiler. It does not require CMake, Go or bindgen according to the upstream build documentation.
-
 ## Implemented boundary
 
-Aes256GcmProvider wraps AWS-LC's randomized-nonce AEAD API. It returns the nonce separately and appends the full 128-bit tag to the ciphertext. Authentication failure returns an error and never returns plaintext. Scratch buffers use a zeroizing RAII guard and are cleared on both success and error (including unwinding); the returned plaintext buffer is caller-owned. Error messages and provider diagnostics omit key material, plaintext and ciphertext.
+Aes256GcmProvider wraps AWS-LC's randomized-nonce AEAD API. It returns the nonce separately and appends the full 128-bit tag to the ciphertext. Authentication failure returns an error and never returns plaintext. Scratch buffers use a zeroizing RAII guard and are cleared on both success and error (including unwinding); the returned plaintext buffer is caller-owned.
 
-This is only the Phase 1.1 provider adapter. It does not implement the seal/key hierarchy, canonical AAD encoding, nonce-use accounting, rotation, persistence or barrier lifecycle. Those remain in their assigned Phase 1 subphases. Do not treat this crate alone as the complete storage barrier.
+The KMP contract is in src/kmp.rs. It exposes KeyManagementProvider using async_trait and Send + Sync, typed errors, validated key/algorithm identifiers, a versioned WrappedKey envelope, and an immutable canonical KeyContext. Community's context encodes the single-tenant identifier root, key purpose and caller-supplied canonical scope. The scope bytes are authenticated verbatim; callers must canonicalize them before construction.
 
-## Validation evidence
+FVK1 uses fixed field ordering and big-endian lengths/versions. Its decoder rejects unsupported versions, invalid identifiers, zero key versions, empty ciphertext, truncation and trailing bytes. Debug output excludes ciphertext and context bytes. Unwrapped key material is returned in Zeroizing<Vec<u8>>.
 
-- NIST AES-256-GCM known-answer tests cover empty plaintext and a single 16-byte block with a 96-bit IV.
-- Wycheproof AES-GCM corpus snapshot: 66 applicable AES-256 / 96-bit-IV / 128-bit-tag vectors (39 valid and 27 invalid). Valid vectors are checked for exact ciphertext and tag; invalid vectors must fail authentication.
-- Deterministic boundary tests cover empty input, AES block boundaries, 64 KiB and 1 MiB payloads, and multiple AAD lengths.
-- Mutation tests flip every nonce byte, every ciphertext/tag byte and every AAD byte; all truncated tag lengths, extended envelopes and wrong-key/wrong-AAD inputs fail closed.
-- Three cargo-fuzz targets cover arbitrary seal/open round trips, arbitrary attacker-controlled envelopes and AAD/nonce/ciphertext/tag mutations. PR CI runs a 60-second smoke campaign per target; a weekly workflow runs five minutes per target.
-- Criterion benchmarks cover seal/open at 64 B, 1 KiB, 16 KiB and 1 MiB. Results must be interpreted with the recorded compiler, runner and hardware; CI timings are not release performance guarantees.
+The provider must cryptographically bind both KeyContext bytes and the envelope's key id, version and algorithm metadata. It must fail closed for unknown identifiers, versions and algorithms, and must never return partial or unauthenticated plaintext.
 
-The exact source revision and license for the vendored test data are recorded in THIRD_PARTY_NOTICES.md.
+Dropping an async future cancels the caller's wait but does not promise rollback of an already accepted remote operation. Implementations must not release partial plaintext or envelopes; callers must treat a cancelled remote outcome as unknown and follow the provider-specific retry contract.
 
-## Fuzzing
+This is still not the complete storage barrier. The KMP interface does not implement seal lifecycle, seal-root/keyring/DEK orchestration, a key database, cloud KMS, canonical barrier AAD, nonce-use accounting, rotation, persistence or re-encryption. Those remain in their assigned Phase 1 subphases.
 
-See [the repository fuzzing guide](../../fuzz/README.md) for the pinned toolchain,
-target inventory, seed policy, local commands and CI campaign budgets. Fuzzing starts
-in Phase 1.1 and is required for later phases wherever untrusted input, parsing,
-cryptographic envelopes or security-boundary state is involved.
+## Validation expected for Phase 1.2
+
+- Contract integration tests exercise an authenticated reference test provider, correct/wrong context and purpose, every scope-byte mutation, key id/version and algorithm metadata, malformed ciphertext, typed errors, dynamic dispatch and Send + Sync.
+- Golden compatibility vectors pin the exact FVC1 context bytes and FVK1 serialized envelope bytes, independently of round-trip/property checks.
+- Deterministic property sweeps exercise 2,000 metadata/ciphertext combinations and canonical encode/decode invariants.
+- Coverage-guided fuzz targets exercise arbitrary FVK1 envelopes and authenticated context mutations. PR CI runs a 60-second smoke campaign per target; weekly/manual CI runs five minutes per target.
+- Existing NIST KAT, Wycheproof, AES-GCM boundary/tamper and multi-platform checks remain required.
+- Loom is not applicable because the KMP contract introduces no internal shared mutable state. Miri runs over the pure-Rust KMP parser tests; it is not treated as an oracle for AWS-LC native FFI. KMP benchmarks are deferred until a concrete provider exists; a local test adapter would not produce representative remote-provider performance measurements.
+
+See the repository fuzzing guide at ../../fuzz/README.md for pinned tooling, target inventory, seed policy, local commands and campaign budgets.

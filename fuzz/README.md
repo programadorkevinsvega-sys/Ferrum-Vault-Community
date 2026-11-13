@@ -12,10 +12,14 @@ that introduces the relevant parser, envelope or protocol; do not defer fuzzing.
 | `seal_open_roundtrip` | Arbitrary AAD/plaintext never panic; provider-generated envelopes round-trip exactly and contain a 12-byte nonce plus 16-byte tag. |
 | `open_arbitrary_payload` | Arbitrary AAD, nonce bytes and ciphertext/tag lengths passed to `open` never panic or release unauthenticated plaintext. |
 | `authentication_mutations` | Changes to AAD, nonce, ciphertext or tag always fail authentication and return no plaintext. |
+| `wrapped_key_decode` | Arbitrary bytes never panic the FVK1 parser; accepted envelopes re-encode byte-for-byte canonically. |
+| `key_context_mutations` | Mutating the caller scope after AES-GCM wrapping always fails authentication. |
 
-The envelope type currently fixes the nonce at `[u8; 12]`; fuzzing therefore covers
-arbitrary nonce contents and malformed ciphertext/tag lengths. A serialized envelope
-parser does not exist yet and must receive its own target when introduced.
+The AES-GCM primitive's `SealedPayload` keeps the nonce at `[u8; 12]` and
+ciphertext/tag bytes separately. The KMP layer adds the serialized FVK1
+`WrappedKey` envelope; `wrapped_key_decode` fuzzes its strict decoder with
+arbitrary bytes, while `key_context_mutations` checks authenticated FVC1 context
+changes. Keep these targets separate because they exercise different boundaries.
 
 ## Run locally
 
@@ -29,6 +33,8 @@ cargo +nightly-2026-11-12 metadata --manifest-path fuzz/Cargo.toml --locked --fo
 cargo +nightly-2026-11-12 fuzz run seal_open_roundtrip -- -max_total_time=300 -max_len=65536 -timeout=10
 cargo +nightly-2026-11-12 fuzz run open_arbitrary_payload -- -max_total_time=300 -max_len=65536 -timeout=10
 cargo +nightly-2026-11-12 fuzz run authentication_mutations -- -max_total_time=300 -max_len=65536 -timeout=10
+cargo +nightly-2026-11-12 fuzz run wrapped_key_decode -- -max_total_time=300 -max_len=65536 -timeout=10
+cargo +nightly-2026-11-12 fuzz run key_context_mutations -- -max_total_time=300 -max_len=65536 -timeout=10
 ```
 
 ## CI policy
@@ -45,7 +51,9 @@ cargo +nightly-2026-11-12 fuzz run authentication_mutations -- -max_total_time=3
 
 ## Other test techniques
 
-KAT, Wycheproof, boundary and deterministic tamper tests remain separate from
-fuzzing. Miri is not used as an oracle for AWS-LC's native cryptographic routines:
-the provider delegates those operations through the native FFI boundary. For later
-pure-Rust code, assess Miri separately and document applicability per component.
+Deterministic model/property sweeps complement coverage-guided fuzzing. KAT,
+Wycheproof, boundary and deterministic tamper tests remain separate from fuzzing.
+The KMP boundary has no internal shared mutable state, so Loom is not applicable.
+CI runs pure-Rust KMP parser tests under Miri. Miri is not an oracle for AWS-LC
+native cryptographic routines because the provider delegates those operations
+through native FFI. Reassess both techniques for later pure-Rust stateful components.
