@@ -24,9 +24,11 @@ Community must remain independently buildable and must never depend on Enterpris
 - [Security policy](SECURITY.md)
 - [License status](LICENSE-STATUS.md)
 
-## License status
+## License
 
-No license file has been published yet. MPL-2.0 is under legal review as the proposed Community license. Until a license is approved and published, do not assume that the repository grants rights to use, modify, redistribute or commercialize its contents.
+The Community edition is provisionally published under the **Mozilla Public License 2.0 (MPL-2.0)**. The exact, unmodified license text is in [LICENSE](LICENSE). See [LICENSE-STATUS.md](LICENSE-STATUS.md) for the provisional status and the legal-review checklist.
+
+MPL-2.0 is a file-level weak-copyleft license: source files covered by it and modifications to those files must remain available under MPL-2.0 when distributed, while a larger work may contain separate files under other terms if the MPL conditions are met. This is a summary, not a substitute for the license text.
 
 ## Project name
 
