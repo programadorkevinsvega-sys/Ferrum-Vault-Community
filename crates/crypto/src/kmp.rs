@@ -42,7 +42,10 @@ impl fmt::Display for KeyManagementError {
             Self::InvalidContext => "invalid key-management context",
             Self::InvalidWrappedKey => "invalid wrapped-key envelope",
             Self::UnsupportedEnvelopeVersion(version) => {
-                return write!(formatter, "unsupported wrapped-key envelope version {version}");
+                return write!(
+                    formatter,
+                    "unsupported wrapped-key envelope version {version}"
+                );
             }
             Self::KeyNotFound => "wrapping key not found",
             Self::KeyVersionUnavailable => "wrapping key version unavailable",
@@ -67,7 +70,9 @@ impl KeyId {
         Ok(Self(value))
     }
 
-    pub fn as_str(&self) -> &str { &self.0 }
+    pub fn as_str(&self) -> &str {
+        &self.0
+    }
 }
 
 impl fmt::Display for KeyId {
@@ -87,7 +92,9 @@ impl AlgorithmId {
         Ok(Self(value))
     }
 
-    pub fn as_str(&self) -> &str { &self.0 }
+    pub fn as_str(&self) -> &str {
+        &self.0
+    }
 }
 
 impl fmt::Display for AlgorithmId {
@@ -101,9 +108,9 @@ fn validate_identifier(value: &str) -> Result<(), ()> {
     if bytes.is_empty()
         || bytes.len() > usize::from(u16::MAX)
         || !bytes[0].is_ascii_alphanumeric()
-        || !bytes.iter().all(|byte| {
-            byte.is_ascii_alphanumeric() || b"._:/+-".contains(byte)
-        })
+        || !bytes
+            .iter()
+            .all(|byte| byte.is_ascii_alphanumeric() || b"._:/+-".contains(byte))
     {
         return Err(());
     }
@@ -141,10 +148,7 @@ pub struct KeyContext {
 impl KeyContext {
     /// Encodes FVC1, u16-BE version, then tenant id, purpose and canonical scope
     /// as three u32-BE length-prefixed byte strings in this fixed order.
-    pub fn new(
-        purpose: KeyPurpose,
-        canonical_scope: &[u8],
-    ) -> Result<Self, KeyManagementError> {
+    pub fn new(purpose: KeyPurpose, canonical_scope: &[u8]) -> Result<Self, KeyManagementError> {
         if canonical_scope.is_empty() {
             return Err(KeyManagementError::InvalidContext);
         }
@@ -162,12 +166,15 @@ impl KeyContext {
     }
 
     /// Returns the canonical bytes providers must authenticate verbatim.
-    pub fn as_bytes(&self) -> &[u8] { &self.encoded }
+    pub fn as_bytes(&self) -> &[u8] {
+        &self.encoded
+    }
 }
 
 impl fmt::Debug for KeyContext {
     fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
-        formatter.debug_struct("KeyContext")
+        formatter
+            .debug_struct("KeyContext")
             .field("encoded_len", &self.encoded.len())
             .finish()
     }
@@ -190,19 +197,29 @@ impl WrappedKey {
         algorithm: AlgorithmId,
         ciphertext: Vec<u8>,
     ) -> Result<Self, KeyManagementError> {
-        if key_version == 0
-            || ciphertext.is_empty()
-            || u32::try_from(ciphertext.len()).is_err()
-        {
+        if key_version == 0 || ciphertext.is_empty() || u32::try_from(ciphertext.len()).is_err() {
             return Err(KeyManagementError::InvalidWrappedKey);
         }
-        Ok(Self { key_id, key_version, algorithm, ciphertext })
+        Ok(Self {
+            key_id,
+            key_version,
+            algorithm,
+            ciphertext,
+        })
     }
 
-    pub fn key_id(&self) -> &KeyId { &self.key_id }
-    pub fn key_version(&self) -> u64 { self.key_version }
-    pub fn algorithm(&self) -> &AlgorithmId { &self.algorithm }
-    pub fn ciphertext(&self) -> &[u8] { &self.ciphertext }
+    pub fn key_id(&self) -> &KeyId {
+        &self.key_id
+    }
+    pub fn key_version(&self) -> u64 {
+        self.key_version
+    }
+    pub fn algorithm(&self) -> &AlgorithmId {
+        &self.algorithm
+    }
+    pub fn ciphertext(&self) -> &[u8] {
+        &self.ciphertext
+    }
 
     /// Canonical FVK1: magic[4], version[u16-BE], key-id length[u16-BE],
     /// key id, key version[u64-BE], algorithm length[u16-BE], algorithm,
@@ -235,13 +252,12 @@ impl WrappedKey {
 
         let key_id_length = reader.read_u16()?;
         let key_id_bytes = reader.read_ascii(key_id_length)?;
-        let key_id = KeyId::new(key_id_bytes)
-            .map_err(|_| KeyManagementError::InvalidWrappedKey)?;
+        let key_id = KeyId::new(key_id_bytes).map_err(|_| KeyManagementError::InvalidWrappedKey)?;
         let key_version = reader.read_u64()?;
         let algorithm_length = reader.read_u16()?;
         let algorithm_bytes = reader.read_ascii(algorithm_length)?;
-        let algorithm = AlgorithmId::new(algorithm_bytes)
-            .map_err(|_| KeyManagementError::InvalidWrappedKey)?;
+        let algorithm =
+            AlgorithmId::new(algorithm_bytes).map_err(|_| KeyManagementError::InvalidWrappedKey)?;
         let ciphertext_len = usize::try_from(reader.read_u32()?)
             .map_err(|_| KeyManagementError::InvalidWrappedKey)?;
         let ciphertext = reader.take(ciphertext_len)?.to_vec();
@@ -255,7 +271,8 @@ impl WrappedKey {
 
 impl fmt::Debug for WrappedKey {
     fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
-        formatter.debug_struct("WrappedKey")
+        formatter
+            .debug_struct("WrappedKey")
             .field("key_id", &self.key_id)
             .field("key_version", &self.key_version)
             .field("algorithm", &self.algorithm)
@@ -271,15 +288,24 @@ fn append_u32_field(output: &mut Vec<u8>, value: &[u8]) -> Result<(), ()> {
     Ok(())
 }
 
-struct Reader<'a> { input: &'a [u8], offset: usize }
+struct Reader<'a> {
+    input: &'a [u8],
+    offset: usize,
+}
 
 impl<'a> Reader<'a> {
-    const fn new(input: &'a [u8]) -> Self { Self { input, offset: 0 } }
+    const fn new(input: &'a [u8]) -> Self {
+        Self { input, offset: 0 }
+    }
 
     fn take(&mut self, length: usize) -> Result<&'a [u8], KeyManagementError> {
-        let end = self.offset.checked_add(length)
+        let end = self
+            .offset
+            .checked_add(length)
             .ok_or(KeyManagementError::InvalidWrappedKey)?;
-        let value = self.input.get(self.offset..end)
+        let value = self
+            .input
+            .get(self.offset..end)
             .ok_or(KeyManagementError::InvalidWrappedKey)?;
         self.offset = end;
         Ok(value)
@@ -298,8 +324,7 @@ impl<'a> Reader<'a> {
     fn read_u64(&mut self) -> Result<u64, KeyManagementError> {
         let bytes = self.take(8)?;
         Ok(u64::from_be_bytes([
-            bytes[0], bytes[1], bytes[2], bytes[3],
-            bytes[4], bytes[5], bytes[6], bytes[7],
+            bytes[0], bytes[1], bytes[2], bytes[3], bytes[4], bytes[5], bytes[6], bytes[7],
         ]))
     }
 
@@ -311,7 +336,9 @@ impl<'a> Reader<'a> {
         String::from_utf8(bytes.to_vec()).map_err(|_| KeyManagementError::InvalidWrappedKey)
     }
 
-    fn is_empty(&self) -> bool { self.offset == self.input.len() }
+    fn is_empty(&self) -> bool {
+        self.offset == self.input.len()
+    }
 }
 
 /// Dynamic asynchronous key-wrapping boundary.
@@ -349,9 +376,18 @@ mod tests {
         assert!(KeyId::new("kms/key-01").is_ok());
         assert!(AlgorithmId::new("AES-256-GCM").is_ok());
         assert_eq!(KeyId::new(""), Err(KeyManagementError::InvalidKeyId));
-        assert_eq!(KeyId::new("../secret"), Err(KeyManagementError::InvalidKeyId));
-        assert_eq!(AlgorithmId::new("AES 256 GCM"), Err(KeyManagementError::InvalidAlgorithm));
-        assert_eq!(AlgorithmId::new("é"), Err(KeyManagementError::InvalidAlgorithm));
+        assert_eq!(
+            KeyId::new("../secret"),
+            Err(KeyManagementError::InvalidKeyId)
+        );
+        assert_eq!(
+            AlgorithmId::new("AES 256 GCM"),
+            Err(KeyManagementError::InvalidAlgorithm)
+        );
+        assert_eq!(
+            AlgorithmId::new("é"),
+            Err(KeyManagementError::InvalidAlgorithm)
+        );
     }
 
     #[test]
@@ -359,7 +395,8 @@ mod tests {
         let first = KeyContext::new(KeyPurpose::DataEncryptionKey, b"keys/app/primary").unwrap();
         let second = KeyContext::new(KeyPurpose::DataEncryptionKey, b"keys/app/primary").unwrap();
         let other_purpose = KeyContext::new(KeyPurpose::KeyringKey, b"keys/app/primary").unwrap();
-        let other_scope = KeyContext::new(KeyPurpose::DataEncryptionKey, b"keys/app/secondary").unwrap();
+        let other_scope =
+            KeyContext::new(KeyPurpose::DataEncryptionKey, b"keys/app/secondary").unwrap();
         assert_eq!(first, second);
         assert_ne!(first, other_purpose);
         assert_ne!(first, other_scope);
@@ -380,12 +417,17 @@ mod tests {
     fn decoder_rejects_every_truncation_and_trailing_data() {
         let encoded = sample_envelope().encode();
         for end in 0..encoded.len() {
-            assert!(WrappedKey::decode(&encoded[..end]).is_err(),
-                "prefix ending at {end} unexpectedly decoded");
+            assert!(
+                WrappedKey::decode(&encoded[..end]).is_err(),
+                "prefix ending at {end} unexpectedly decoded"
+            );
         }
         let mut trailing = encoded;
         trailing.push(0);
-        assert_eq!(WrappedKey::decode(&trailing), Err(KeyManagementError::InvalidWrappedKey));
+        assert_eq!(
+            WrappedKey::decode(&trailing),
+            Err(KeyManagementError::InvalidWrappedKey)
+        );
     }
 
     #[test]
@@ -393,14 +435,22 @@ mod tests {
         let encoded = sample_envelope().encode();
         let mut unknown_version = encoded.clone();
         unknown_version[4..6].copy_from_slice(&2_u16.to_be_bytes());
-        assert_eq!(WrappedKey::decode(&unknown_version),
-            Err(KeyManagementError::UnsupportedEnvelopeVersion(2)));
+        assert_eq!(
+            WrappedKey::decode(&unknown_version),
+            Err(KeyManagementError::UnsupportedEnvelopeVersion(2))
+        );
         let mut zero_version = encoded.clone();
         zero_version[14..22].copy_from_slice(&0_u64.to_be_bytes());
-        assert_eq!(WrappedKey::decode(&zero_version), Err(KeyManagementError::InvalidWrappedKey));
+        assert_eq!(
+            WrappedKey::decode(&zero_version),
+            Err(KeyManagementError::InvalidWrappedKey)
+        );
         let mut bad_magic = encoded;
         bad_magic[0] ^= 0x80;
-        assert_eq!(WrappedKey::decode(&bad_magic), Err(KeyManagementError::InvalidWrappedKey));
+        assert_eq!(
+            WrappedKey::decode(&bad_magic),
+            Err(KeyManagementError::InvalidWrappedKey)
+        );
     }
 
     #[test]
@@ -413,12 +463,16 @@ mod tests {
             let key_id = KeyId::new(format!("provider/key-{index}")).unwrap();
             let algorithm = AlgorithmId::new("AES-256-GCM").unwrap();
             let ciphertext_len = (state as usize % 256) + 1;
-            let ciphertext = (0..ciphertext_len).map(|offset| {
-                state = state.wrapping_mul(6_364_136_223_846_793_005)
-                    .wrapping_add(1_442_695_040_888_963_407);
-                (state >> (offset % 32)) as u8
-            }).collect();
-            let wrapped = WrappedKey::new(key_id, (state | 1).max(1), algorithm, ciphertext).unwrap();
+            let ciphertext = (0..ciphertext_len)
+                .map(|offset| {
+                    state = state
+                        .wrapping_mul(6_364_136_223_846_793_005)
+                        .wrapping_add(1_442_695_040_888_963_407);
+                    (state >> (offset % 32)) as u8
+                })
+                .collect();
+            let wrapped =
+                WrappedKey::new(key_id, (state | 1).max(1), algorithm, ciphertext).unwrap();
             let encoded = wrapped.encode();
             let decoded = WrappedKey::decode(&encoded).expect("generated envelope decodes");
             assert_eq!(decoded, wrapped);
@@ -430,8 +484,14 @@ mod tests {
     fn provider_failures_have_non_sensitive_diagnostics() {
         let unavailable = KeyManagementError::ProviderUnavailable;
         let failed = KeyManagementError::ProviderFailure;
-        assert_eq!(unavailable.to_string(), "key-management provider unavailable");
-        assert_eq!(failed.to_string(), "key-management provider operation failed");
+        assert_eq!(
+            unavailable.to_string(),
+            "key-management provider unavailable"
+        );
+        assert_eq!(
+            failed.to_string(),
+            "key-management provider operation failed"
+        );
         assert!(!unavailable.to_string().contains("secret"));
     }
 
@@ -441,6 +501,7 @@ mod tests {
             7,
             AlgorithmId::new("AES-256-GCM").unwrap(),
             vec![0xA5; 48],
-        ).unwrap()
+        )
+        .unwrap()
     }
 }

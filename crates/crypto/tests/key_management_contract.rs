@@ -8,8 +8,8 @@ use async_trait::async_trait;
 use ferrum_crypto::{
     Aes256GcmProvider, CryptoError, SealedPayload,
     kmp::{
-        AlgorithmId, KeyContext, KeyId, KeyManagementError, KeyManagementProvider,
-        KeyPurpose, WrappedKey,
+        AlgorithmId, KeyContext, KeyId, KeyManagementError, KeyManagementProvider, KeyPurpose,
+        WrappedKey,
     },
 };
 use zeroize::Zeroizing;
@@ -52,12 +52,20 @@ impl KeyManagementProvider for TestProvider {
         }
 
         let aad = authenticated_aad(context, key_id, self.key_version, &self.algorithm);
-        let sealed = self.cipher.seal(&aad, plaintext).map_err(map_crypto_error)?;
+        let sealed = self
+            .cipher
+            .seal(&aad, plaintext)
+            .map_err(map_crypto_error)?;
         let mut ciphertext = Vec::with_capacity(12 + sealed.ciphertext_and_tag.len());
         ciphertext.extend_from_slice(&sealed.nonce);
         ciphertext.extend_from_slice(&sealed.ciphertext_and_tag);
 
-        WrappedKey::new(key_id.clone(), self.key_version, self.algorithm.clone(), ciphertext)
+        WrappedKey::new(
+            key_id.clone(),
+            self.key_version,
+            self.algorithm.clone(),
+            ciphertext,
+        )
     }
 
     async fn unwrap(
