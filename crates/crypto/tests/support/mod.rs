@@ -14,7 +14,7 @@ pub fn decode_hex(value: &str) -> Vec<u8> {
     assert_eq!(value.len() % 2, 0, "hex input must have an even length");
     value
         .as_bytes()
-        .chunks_exact(2)
+        .chunks(2)
         .map(|pair| {
             let high = (pair[0] as char).to_digit(16).expect("valid hex");
             let low = (pair[1] as char).to_digit(16).expect("valid hex");
