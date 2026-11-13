@@ -1,0 +1,31 @@
+name: CI
+on:
+  pull_request:
+    branches: [main]
+  push:
+    branches: [main, migration/community-public-foundation]
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: community-ci-${{ github.ref }}
+  cancel-in-progress: false
+jobs:
+  quality:
+    name: Public repository quality gates
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Check out repository history
+        uses: actions/checkout@1af3b93b6815bc44a9784bd300feb67ff0d1eeb3
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - name: Check whitespace and patch errors
+        if: github.event_name == 'pull_request'
+        shell: bash
+        run: |
+          set -euo pipefail
+          git diff --check "origin/${{ github.base_ref }}...HEAD"
+      - name: Validate public Markdown links and anchors
+        run: python3 scripts/check_markdown_links.py
