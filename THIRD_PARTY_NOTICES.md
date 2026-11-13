@@ -36,3 +36,8 @@ Before adding a dependency, copied code, asset, generated artifact or runtime co
 5. Update this file and the applicable SBOM or dependency inventory when those artifacts are introduced.
 
 If provenance or licensing is unclear, do not merge or publish the material until it has been reviewed.
+
+
+## Secret-scanner handling for test vectors
+
+The Wycheproof fixture contains published fixed AES-GCM keys. They are test inputs, not credentials. The repository Gitleaks configuration allows only the JSON `key` property with an AES key length in this exact fixture file and only for the `generic-api-key` rule. The default secret-scanning rules remain enabled for every other file and value.

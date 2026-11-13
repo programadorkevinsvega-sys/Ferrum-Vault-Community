@@ -50,3 +50,8 @@ Criterion benchmarks cover encryption and decryption for 64-byte, 1-KiB, 16-KiB 
 ## Verification boundary
 
 This phase demonstrates correct provider integration for its selected algorithm/profile. It does not complete the barrier format, canonical AAD encoder, key management, nonce-budget/rotation controls, memory protection, seal lifecycle, KMS integration, storage or independent cryptographic review.
+
+
+## Secret-scanner false-positive handling
+
+Gitleaks may classify the `key` properties in the vendored Wycheproof JSON as generic API keys. They are fixed public AES-GCM test-vector inputs, not service credentials. The repository configuration permits only lines matching the documented AES key hex lengths in this exact fixture path and only for the `generic-api-key` detector. The default detection rules and scans of every other path remain enabled.
