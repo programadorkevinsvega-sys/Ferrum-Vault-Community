@@ -12,7 +12,7 @@ permissions:
 
 concurrency:
   group: community-ci-${{ github.ref }}
-  cancel-in-progress: false
+  cancel-in-progress: true
 
 jobs:
   rust:
