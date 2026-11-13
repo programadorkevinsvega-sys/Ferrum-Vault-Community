@@ -1,0 +1,16 @@
+[package]
+name = "ferrum-recovery"
+version = "0.1.0"
+description = "Offline root recovery and Shamir custody primitives for Ferrum Community"
+edition.workspace = true
+license.workspace = true
+rust-version.workspace = true
+repository.workspace = true
+publish = false
+
+[dependencies]
+aws-lc-rs.workspace = true
+rand.workspace = true
+rand_core.workspace = true
+vsss-rs.workspace = true
+zeroize.workspace = true
