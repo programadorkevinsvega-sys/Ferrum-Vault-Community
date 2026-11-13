@@ -4,9 +4,9 @@ This roadmap describes the public Community edition. It records approved design 
 
 ## Current status
 
-**Phase 0 — Foundations: documentation baseline in progress.** The repository is documentation-only: it has no Cargo workspace, Rust runtime, server or CLI. The public architecture decisions have been carried over into [Community ADRs](docs/adr/README.md). Phase 0 remains open until its remaining Definition of Done and owner acceptance are recorded.
+**Phase 0 — Foundations: documentation baseline in progress.** The repository now includes the initial cryptographic Cargo workspace, but it does not yet contain a complete Rust runtime, server or CLI. The public architecture decisions have been carried over into [Community ADRs](docs/adr/README.md). Phase 0 remains open until its remaining Definition of Done and owner acceptance are recorded.
 
-**Phase 1 — Seal and encrypted storage: implementation in progress.** Subphase 1.1 (cryptographic provider, vectors, deterministic boundary tests and fuzz baseline) is implemented and CI-verified in [PR #10](https://github.com/programadorkevinsvega-sys/Ferrum-Vault-Community/pull/10) and [PR #12](https://github.com/programadorkevinsvega-sys/Ferrum-Vault-Community/pull/12). Subphases 1.2–1.7 remain pending. The approved design inputs are in public ADRs 0001–0004 and 0013–0014. The implementation must follow the phase gates below and must not guess explicitly pending parameters.
+**Phase 1 — Seal and encrypted storage: implementation in progress.** Subphase 1.1 (cryptographic provider, vectors, deterministic boundary tests and fuzz baseline) is implemented in [PR #10](https://github.com/programadorkevinsvega-sys/Ferrum-Vault-Community/pull/10), [PR #12](https://github.com/programadorkevinsvega-sys/Ferrum-Vault-Community/pull/12) and [PR #13](https://github.com/programadorkevinsvega-sys/Ferrum-Vault-Community/pull/13). Subphase 1.2 is under implementation and review in this change; subphases 1.3–1.7 remain pending. The approved design inputs are in public ADRs 0001–0004 and 0013–0014. The implementation must follow the phase gates below and must not guess explicitly pending parameters.
 
 ## Phase overview
 
@@ -39,9 +39,11 @@ Provider implementation and boundaries are documented in [the crypto crate](crat
 
 ### 1.2 Key-management provider contract
 
-Implement the approved wrap(key_id, plaintext, context) and unwrap(wrapped, context) interface with typed errors and stable authenticated context.
+Implement the approved wrap(key_id, plaintext, context) and unwrap(wrapped, context) interface with typed errors, stable authenticated context, a versioned canonical envelope and an object-safe async provider boundary. The Community context binds tenant id root, key purpose and caller-supplied canonical scope. The FVK1 decoder rejects malformed metadata, unsupported versions, truncation and trailing bytes. Providers cryptographically bind key id, key version, algorithm and context to the protected ciphertext.
 
-**Definition of Done:** contract and compatibility tests cover correct context, wrong context, key identifier/version and provider failures; property and fuzz tests exercise malformed wrapped-key envelopes and context mutations.
+**Definition of Done:** contract tests cover correct/wrong context, per-byte context mutations, key identifier/version, unsupported algorithm and provider failures; deterministic property checks exercise canonical encode/decode invariants; coverage-guided fuzz tests exercise malformed wrapped-key envelopes and context mutations. PR CI runs bounded smoke campaigns and scheduled/manual CI runs extended campaigns. Cloud KMS adapters, key hierarchy orchestration, rotation and seal lifecycle remain outside this subphase.
+
+**Implementation status — under review:** the interface, FVC1 context encoding, FVK1 envelope codec, test-only authenticated reference provider, deterministic property sweeps, Miri coverage for the pure-Rust parser and two additional fuzz targets are included in this change. See [the KMP contract and security notes](docs/security/key-management-provider-contract.md). Completion depends on exact PR-head quality gates, cross-platform tests, MSRV, fuzz smoke jobs and Gitleaks checks passing.
 
 ### 1.3 Recovery ceremony and Shamir
 

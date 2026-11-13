@@ -12,6 +12,9 @@ use std::fmt;
 use aws_lc_rs::aead::{AES_256_GCM, Aad, NONCE_LEN, Nonce, RandomizedNonceKey};
 use zeroize::Zeroizing;
 
+/// Asynchronous key-management provider contract.
+pub mod kmp;
+
 /// Exact cryptographic provider selected by the owner-approved ADR-0013.
 pub const CRYPTO_PROVIDER_VERSION: &str = "aws-lc-rs/1.19.0";
 

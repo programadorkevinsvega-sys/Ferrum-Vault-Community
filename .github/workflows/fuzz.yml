@@ -24,6 +24,8 @@ jobs:
           - seal_open_roundtrip
           - open_arbitrary_payload
           - authentication_mutations
+          - wrapped_key_decode
+          - key_context_mutations
     steps:
       - name: Check out repository
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1

@@ -82,6 +82,8 @@ jobs:
           - seal_open_roundtrip
           - open_arbitrary_payload
           - authentication_mutations
+          - wrapped_key_decode
+          - key_context_mutations
     steps:
       - name: Check out repository
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
@@ -129,9 +131,25 @@ jobs:
       - name: Test minimum supported Rust version
         run: cargo +1.98.0 test --locked --workspace --all-targets
 
+  miri-kmp:
+    name: Miri (pure-Rust KMP parser)
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          persist-credentials: false
+      - name: Install pinned Miri toolchain
+        run: rustup toolchain install nightly-2026-11-12 --profile minimal --component miri
+      - name: Prepare Miri sysroot
+        run: cargo +nightly-2026-11-12 miri setup
+      - name: Run pure-Rust KMP parser tests under Miri
+        run: cargo +nightly-2026-11-12 miri test --locked -p ferrum-crypto --lib kmp::tests
+
   quality:
     name: Public repository quality gates
-    needs: [rust, crypto-fuzz-smoke, msrv]
+    needs: [rust, crypto-fuzz-smoke, msrv, miri-kmp]
     runs-on: ubuntu-latest
     timeout-minutes: 10
     steps:

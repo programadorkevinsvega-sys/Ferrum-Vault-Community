@@ -18,7 +18,9 @@ This file tracks third-party material distributed with or referenced by Ferrum V
 - The fixture is reproduced at crates/crypto/tests/vectors/aes_gcm_test.json. The applicable AES-256-GCM profile is filtered by key size 256 bits, IV size 96 bits and tag size 128 bits.
 - Wycheproof test data is distributed under Apache License 2.0. The exact upstream license text is retained at crates/crypto/tests/vectors/LICENSE-APACHE-2.0.txt.
 
-## Development and test dependencies
+## Compile-time and development dependencies
+
+- **async-trait 0.1.89** — exact compile-time dependency used to expose object-safe asynchronous extension traits; source: https://github.com/dtolnay/async-trait/tree/0.1.89; SPDX expression: `MIT OR Apache-2.0`. The procedural macro is expanded at compile time and is not a runtime service dependency.
 
 - **Criterion 0.8.2** — benchmark-only dependency; source: https://github.com/criterion-rs/criterion.rs; SPDX expression: `Apache-2.0 OR MIT`.
 - **serde_json 1.0.154** — test-only JSON parser for the Wycheproof corpus; SPDX expression: `MIT OR Apache-2.0`.
