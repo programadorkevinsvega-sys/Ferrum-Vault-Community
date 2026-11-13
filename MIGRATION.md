@@ -22,9 +22,10 @@ This documentation update corrects that gap:
 
 - Public Community ADRs 0001–0023 preserve the source decision identifiers and statuses.
 - Each public ADR records its source decision ID and the reviewed baseline commit.
+- [The source classification matrix](docs/adr/SOURCE-MAP.md) classifies all 24 source ADRs by Community scope, shared scope, split-edition scope or owner-only repository administration.
 - Decisions applicable to both editions are adapted to Community scope only.
 - Private-edition implementation detail and owner-only repository administration are not reproduced.
-- The unabridged internal decision records remain in the private engineering repository; this public directory is sufficient to understand and implement the Community edition without consulting private documents.
+- The unabridged internal decision records remain in the private engineering repository; the public Community ADR set records the decisions needed for Community design and implementation without requiring access to private documents.
 - Pending parameters remain explicitly pending. This migration does not approve a numeric AES-GCM rotation threshold, nonce-reservation block size or generate-root quorum.
 
 The public records are English-language adaptations for Community, not a transfer of the original ADR files or Git history.

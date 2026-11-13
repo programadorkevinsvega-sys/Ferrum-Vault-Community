@@ -2,6 +2,8 @@
 
 This directory contains the public, Community-scoped adaptations of the owner's approved Ferrum architecture decisions. They preserve the source decision identifiers and status while omitting private-edition implementation details and owner-only repository administration.
 
+See the [source ADR classification and carryover matrix](SOURCE-MAP.md) for the per-decision edition/scope classification and the reason each original ADR was published, adapted or withheld.
+
 ## Decision status
 
 - **Owner-approved:** the owner approved the architecture decision in the source baseline.
