@@ -15,9 +15,11 @@ that introduces the relevant parser, envelope or protocol; do not defer fuzzing.
 | `wrapped_key_decode` | Arbitrary bytes never panic the FVK1 parser; accepted envelopes re-encode byte-for-byte canonically. |
 | `key_context_mutations` | Mutating the caller scope after AES-GCM wrapping always fails authentication. |
 
-The envelope type currently fixes the nonce at `[u8; 12]`; fuzzing therefore covers
-arbitrary nonce contents and malformed ciphertext/tag lengths. A serialized envelope
-parser does not exist yet and must receive its own target when introduced.
+The AES-GCM primitive's `SealedPayload` keeps the nonce at `[u8; 12]` and
+ciphertext/tag bytes separately. The KMP layer adds the serialized FVK1
+`WrappedKey` envelope; `wrapped_key_decode` fuzzes its strict decoder with
+arbitrary bytes, while `key_context_mutations` checks authenticated FVC1 context
+changes. Keep these targets separate because they exercise different boundaries.
 
 ## Run locally
 

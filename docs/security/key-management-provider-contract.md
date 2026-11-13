@@ -27,7 +27,7 @@ Its binary form is:
 2. Format version 1 as unsigned 16-bit big-endian.
 3. Tenant id, purpose and scope, in that order, each prefixed by an unsigned 32-bit big-endian byte length.
 
-The context is passed separately to wrap and unwrap; implementations must authenticate the exact context bytes with the wrapped-key operation. Callers must supply already-canonical scope bytes. Context normalization is deliberately not performed inside the provider boundary. This format is separate from the storage-barrier AAD layout specified by ADR-0004.
+The context is passed separately to wrap and unwrap; implementations must authenticate the exact context bytes with the wrapped-key operation. The exact FVC1 bytes are pinned by a golden compatibility vector in the crate tests. Callers must supply already-canonical scope bytes. Context normalization is deliberately not performed inside the provider boundary. This format is separate from the storage-barrier AAD layout specified by ADR-0004.
 
 ## FVK1 wrapped-key envelope
 
@@ -42,7 +42,7 @@ The decoder accepts exactly one complete envelope:
 | Algorithm length and bytes | unsigned 16-bit big-endian length, then validated ASCII id |
 | Ciphertext length and bytes | nonzero unsigned 32-bit big-endian length, then opaque bytes |
 
-There are no optional fields, extensions or trailing bytes in version 1. Unknown versions are rejected with a typed error. Length arithmetic is checked, reads are bounded against the input slice, and ciphertext is allocated only after its complete declared slice has been verified to exist. Any future incompatible change requires a new envelope version; do not reinterpret FVK1 fields in place.
+There are no optional fields, extensions or trailing bytes in version 1. A golden FVK1 byte vector is decoded and re-encoded by the conformance tests to pin field order, lengths and big-endian representation independently of the round-trip property checks. Unknown versions are rejected with a typed error. Length arithmetic is checked, reads are bounded against the input slice, and ciphertext is allocated only after its complete declared slice has been verified to exist. Any future incompatible change requires a new envelope version; do not reinterpret FVK1 fields in place.
 
 The envelope metadata is security-sensitive. Providers must cryptographically bind key id, key version, algorithm identifier and context to the protected ciphertext (for example, through authenticated associated data or an equivalent provider-authenticated mechanism). They must not trust envelope claims without validating them against provider state. A caller must never be able to redirect an envelope to a different key/version or algorithm without authentication failure.
 
@@ -54,6 +54,6 @@ Dropping an async future cancels the caller's wait; it does not guarantee that a
 
 ## Verification
 
-The conformance suite uses a test-only AES-GCM reference provider to validate context and metadata authentication plus typed failure behavior. It does not constitute a production local KEK store or cloud adapter. Deterministic property sweeps test canonical encode/decode round trips. Fuzz targets feed arbitrary bytes to the FVK1 decoder and mutate scope bytes after wrapping. CI runs bounded per-target smoke campaigns; scheduled/manual runs extend each campaign.
+The conformance suite uses a test-only AES-GCM reference provider to validate context and metadata authentication plus typed failure behavior. Golden byte vectors pin the FVC1 and FVK1 encodings; separate tests validate purpose binding and mutations of key id, version and algorithm metadata. It does not constitute a production local KEK store or cloud adapter. Deterministic property sweeps test canonical encode/decode round trips. Fuzz targets feed arbitrary bytes to the FVK1 decoder and mutate scope bytes after wrapping. CI runs bounded per-target smoke campaigns; scheduled/manual runs extend each campaign.
 
 Loom is not applicable because this interface has no internal shared mutable state. CI runs the pure-Rust KMP parser tests under Miri; Miri is not used to validate AWS-LC native FFI internals. Provider performance benchmarks are deferred until an actual provider exists, because a test adapter would not yield representative provider measurements.

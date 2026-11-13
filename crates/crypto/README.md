@@ -30,7 +30,8 @@ This is still not the complete storage barrier. The KMP interface does not imple
 
 ## Validation expected for Phase 1.2
 
-- Contract integration tests exercise an authenticated reference test provider, correct/wrong context, every scope-byte mutation, key id/version and algorithm metadata, malformed ciphertext, typed errors, dynamic dispatch and Send + Sync.
+- Contract integration tests exercise an authenticated reference test provider, correct/wrong context and purpose, every scope-byte mutation, key id/version and algorithm metadata, malformed ciphertext, typed errors, dynamic dispatch and Send + Sync.
+- Golden compatibility vectors pin the exact FVC1 context bytes and FVK1 serialized envelope bytes, independently of round-trip/property checks.
 - Deterministic property sweeps exercise 2,000 metadata/ciphertext combinations and canonical encode/decode invariants.
 - Coverage-guided fuzz targets exercise arbitrary FVK1 envelopes and authenticated context mutations. PR CI runs a 60-second smoke campaign per target; weekly/manual CI runs five minutes per target.
 - Existing NIST KAT, Wycheproof, AES-GCM boundary/tamper and multi-platform checks remain required.

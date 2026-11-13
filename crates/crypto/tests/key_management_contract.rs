@@ -201,6 +201,24 @@ fn every_context_scope_byte_is_authenticated() {
     }
 }
 
+
+#[test]
+fn key_purpose_is_part_of_the_authenticated_context() {
+    let provider = TestProvider::new();
+    let key_id = KeyId::new("test/local-kek").unwrap();
+    let original_context =
+        KeyContext::new(KeyPurpose::DataEncryptionKey, b"keys/application/primary").unwrap();
+    let wrapped =
+        run_ready(provider.wrap(&key_id, &[0x66; 32], &original_context)).unwrap();
+
+    let changed_purpose =
+        KeyContext::new(KeyPurpose::KeyringKey, b"keys/application/primary").unwrap();
+    assert_eq!(
+        run_ready(provider.unwrap(&wrapped, &changed_purpose)),
+        Err(KeyManagementError::AuthenticationFailed)
+    );
+}
+
 #[test]
 fn envelope_metadata_is_cryptographically_bound() {
     let provider = TestProvider::new();
@@ -218,6 +236,36 @@ fn envelope_metadata_is_cryptographically_bound() {
     assert_eq!(
         run_ready(provider.unwrap(&redirected, &context)),
         Err(KeyManagementError::AuthenticationFailed)
+    );
+
+    let mut nonce = [0_u8; 12];
+    nonce.copy_from_slice(&wrapped.ciphertext()[..12]);
+    let payload = SealedPayload {
+        nonce,
+        ciphertext_and_tag: wrapped.ciphertext()[12..].to_vec(),
+    };
+
+    let changed_version_aad = authenticated_aad(
+        &context,
+        wrapped.key_id(),
+        wrapped.key_version() + 1,
+        wrapped.algorithm(),
+    );
+    assert_eq!(
+        provider.cipher.open(&changed_version_aad, &payload),
+        Err(CryptoError::AuthenticationFailed)
+    );
+
+    let changed_algorithm = AlgorithmId::new("AES-256-GCM-ALIAS").unwrap();
+    let changed_algorithm_aad = authenticated_aad(
+        &context,
+        wrapped.key_id(),
+        wrapped.key_version(),
+        &changed_algorithm,
+    );
+    assert_eq!(
+        provider.cipher.open(&changed_algorithm_aad, &payload),
+        Err(CryptoError::AuthenticationFailed)
     );
 }
 
