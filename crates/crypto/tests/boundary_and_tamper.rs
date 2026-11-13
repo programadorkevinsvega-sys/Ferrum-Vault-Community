@@ -7,8 +7,8 @@ const AAD: &[u8] = b"ferrum/phase-1.1/boundary-test";
 fn round_trips_empty_block_edges_and_large_payloads() {
     let provider = Aes256GcmProvider::new(&KEY).expect("valid AES-256 key");
     let plaintext_lengths = [
-        0, 1, 15, 16, 17, 31, 32, 63, 64, 255, 256, 1023, 1024, 4095, 4096, 16_384,
-        65_535, 65_536, 1_048_576,
+        0, 1, 15, 16, 17, 31, 32, 63, 64, 255, 256, 1023, 1024, 4095, 4096, 16_384, 65_535, 65_536,
+        1_048_576,
     ];
     let aad_lengths = [0, 1, 15, 16, 32, 255];
 
@@ -101,8 +101,7 @@ fn wrong_key_and_wrong_aad_never_release_plaintext() {
     let provider = Aes256GcmProvider::new(&KEY).expect("valid AES-256 key");
     let payload = provider.seal(AAD, b"secret").expect("seal succeeds");
     let wrong_key = [0x24; 32];
-    let other_provider =
-        Aes256GcmProvider::new(&wrong_key).expect("valid alternate AES-256 key");
+    let other_provider = Aes256GcmProvider::new(&wrong_key).expect("valid alternate AES-256 key");
 
     assert_eq!(
         provider.open(b"wrong context", &payload),
