@@ -1,7 +1,28 @@
+# Rust build output (when implementation is authorized)
 /target/
+/**/target/
+
+# Local environment and secrets
 .env
 .env.*
 !.env.example
 *.pem
 *.key
+*.p12
+*.pfx
+*.jks
+*.keystore
+secrets/
+recovery-shares/
+
+# Editor / OS
 .DS_Store
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# Test and coverage artifacts
+/coverage/
+/lcov.info
+/profraw/
