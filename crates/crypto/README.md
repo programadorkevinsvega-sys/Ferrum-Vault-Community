@@ -24,7 +24,16 @@ This is only the Phase 1.1 provider adapter. It does not implement the seal/key 
 
 - NIST AES-256-GCM known-answer tests cover empty plaintext and a single 16-byte block with a 96-bit IV.
 - Wycheproof AES-GCM corpus snapshot: 66 applicable AES-256 / 96-bit-IV / 128-bit-tag vectors (39 valid and 27 invalid). Valid vectors are checked for exact ciphertext and tag; invalid vectors must fail authentication.
-- Negative tests cover altered AAD and modified authentication tags.
+- Deterministic boundary tests cover empty input, AES block boundaries, 64 KiB and 1 MiB payloads, and multiple AAD lengths.
+- Mutation tests flip every nonce byte, every ciphertext/tag byte and every AAD byte; all truncated tag lengths, extended envelopes and wrong-key/wrong-AAD inputs fail closed.
+- Three cargo-fuzz targets cover arbitrary seal/open round trips, arbitrary attacker-controlled envelopes and AAD/nonce/ciphertext/tag mutations. PR CI runs a 60-second smoke campaign per target; a weekly workflow runs five minutes per target.
 - Criterion benchmarks cover seal/open at 64 B, 1 KiB, 16 KiB and 1 MiB. Results must be interpreted with the recorded compiler, runner and hardware; CI timings are not release performance guarantees.
 
 The exact source revision and license for the vendored test data are recorded in THIRD_PARTY_NOTICES.md.
+
+## Fuzzing
+
+See [the repository fuzzing guide](../../fuzz/README.md) for the pinned toolchain,
+target inventory, seed policy, local commands and CI campaign budgets. Fuzzing starts
+in Phase 1.1 and is required for later phases wherever untrusted input, parsing,
+cryptographic envelopes or security-boundary state is involved.

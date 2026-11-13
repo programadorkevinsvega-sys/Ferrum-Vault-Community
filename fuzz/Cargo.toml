@@ -1,0 +1,38 @@
+[package]
+name = "ferrum-crypto-fuzz"
+version = "0.0.0"
+edition = "2024"
+license = "MPL-2.0"
+publish = false
+
+[package.metadata]
+cargo-fuzz = true
+
+[dependencies]
+ferrum-crypto = { path = "../crates/crypto" }
+libfuzzer-sys = "=0.4.13"
+
+[[bin]]
+name = "seal_open_roundtrip"
+path = "fuzz_targets/seal_open_roundtrip.rs"
+test = false
+doc = false
+bench = false
+
+[[bin]]
+name = "open_arbitrary_payload"
+path = "fuzz_targets/open_arbitrary_payload.rs"
+test = false
+doc = false
+bench = false
+
+[[bin]]
+name = "authentication_mutations"
+path = "fuzz_targets/authentication_mutations.rs"
+test = false
+doc = false
+bench = false
+
+[workspace]
+members = []
+resolver = "3"
