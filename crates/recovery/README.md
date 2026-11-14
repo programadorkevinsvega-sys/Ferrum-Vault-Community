@@ -2,7 +2,7 @@
 
 Phase 1.3 offline root recovery primitives.
 
-- Shamir sharing uses the audited-upstream `vsss-rs` GF(256) implementation, pinned to 6.0.1 with only `std` and `zeroize` features enabled.
+- Shamir sharing uses the upstream `vsss-rs` GF(256) implementation, pinned to 6.0.1 with only `std` and `zeroize` features enabled.
 - Default policy is 5 shares / 3 required; both are configurable. Policies below 2-of-n and more than 255 shares are rejected.
 - FRS1 carries a versioned header, ceremony identifier, public policy, original secret length, an integrity tag and one raw Shamir share.
 - A fresh random HMAC-SHA-256 verification key is itself included in the Shamir secret. Recovery verifies the combined result before returning any root bytes. A corrupted share therefore fails closed rather than silently yielding wrong root material.
