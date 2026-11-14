@@ -89,7 +89,10 @@ impl<'a> UnsealRequest<'a> {
         Self::from_source(expected_ceremony_id, UnsealSource::Shamir(shares))
     }
 
-    pub fn from_wrapped(expected_ceremony_id: [u8; 16], wrapped_root: &'a WrappedRootEnvelope) -> Self {
+    pub fn from_wrapped(
+        expected_ceremony_id: [u8; 16],
+        wrapped_root: &'a WrappedRootEnvelope,
+    ) -> Self {
         Self::from_source(expected_ceremony_id, UnsealSource::Wrapped(wrapped_root))
     }
 

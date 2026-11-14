@@ -11,7 +11,7 @@ use async_trait::async_trait;
 use aws_lc_rs::digest::{self, SHA256};
 use zeroize::Zeroizing;
 
-use crate::unsealer::{WrappedRootEnvelope, UnsealRequest, UnsealSource, Unsealer, UnsealerError};
+use crate::unsealer::{UnsealRequest, UnsealSource, Unsealer, UnsealerError, WrappedRootEnvelope};
 
 pub const AWS_KMS_CONTEXT_KEY: &str = "FerrumContextSHA256V1";
 pub const AWS_KMS_ALGORITHM: &str = "AWS-KMS";
@@ -220,8 +220,8 @@ fn append_context_field(output: &mut Vec<u8>, value: &[u8]) {
 mod tests {
     use super::{AwsKmsApi, AwsKmsUnsealer, KmsApiError, KmsCiphertext, KmsPlaintext};
     use crate::{
-        WrappedRootEnvelope, RootQuorumOperation, RootQuorumPolicy, SealController, SealError,
-        SealStatus, UnsealRequest, UnsealSource, Unsealer, UnsealerError,
+        RootQuorumOperation, RootQuorumPolicy, SealController, SealError, SealStatus,
+        UnsealRequest, UnsealSource, Unsealer, UnsealerError, WrappedRootEnvelope,
     };
     use async_trait::async_trait;
     use ferrum_recovery::{RecoveryPolicy, RecoveryShare, split_secret};
@@ -466,8 +466,11 @@ mod tests {
             block_on(adapter.encrypt_root_for_unseal(root, shares[0].ceremony_id())).unwrap();
         adapter.client.set_failure(Some(KmsApiError::Timeout));
         assert_eq!(
-            block_on(adapter.unseal(UnsealRequest::from_wrapped(shares[0].ceremony_id(), &wrapped)))
-                .err(),
+            block_on(adapter.unseal(UnsealRequest::from_wrapped(
+                shares[0].ceremony_id(),
+                &wrapped
+            )))
+            .err(),
             Some(UnsealerError::ProviderTimeout)
         );
         assert_eq!(
