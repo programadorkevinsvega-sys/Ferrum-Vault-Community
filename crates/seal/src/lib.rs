@@ -16,6 +16,13 @@ use aws_lc_rs::rand::{SecureRandom, SystemRandom};
 use ferrum_recovery::{RecoveryPolicy, RecoveryShare, recover_secret};
 use zeroize::Zeroizing;
 
+pub mod unsealer;
+#[cfg(feature = "aws-kms")]
+pub mod aws_kms;
+pub use unsealer::{
+    KmsWrappedRoot, ShamirUnsealer, UnsealRequest, UnsealSource, Unsealer, UnsealerError,
+};
+
 const BOOTSTRAP_TOKEN_LEN: usize = 32;
 const BOOTSTRAP_TOKEN_DOMAIN: &[u8] = b"Ferrum Community bootstrap token verifier v1\0";
 
@@ -352,6 +359,11 @@ impl SealController {
             .first()
             .map(RecoveryShare::policy)
             .ok_or(SealError::BootstrapRejected)?;
+        let required_unseal_policy =
+            RecoveryPolicy::new(2, 3).map_err(|_| SealError::BootstrapRejected)?;
+        if recovery_policy != required_unseal_policy {
+            return Err(SealError::BootstrapRejected);
+        }
         {
             let inner = self.lock();
             if inner
@@ -418,11 +430,8 @@ impl SealController {
             )
         };
 
-        let supplied_ceremony_id = matching_ceremony_id(shares).ok_or(SealError::UnsealRejected)?;
-        if !constant_time_equal(&expected_ceremony_id, &supplied_ceremony_id) {
-            return Err(SealError::UnsealRejected);
-        }
-        let recovered = recover_secret(shares).map_err(|_| SealError::UnsealRejected)?;
+        let recovered = ShamirUnsealer::unseal_shares(expected_ceremony_id, shares)
+            .map_err(|_| SealError::UnsealRejected)?;
 
         let mut inner = self.lock();
         if inner.status != SealStatus::Sealed || inner.generation != expected_generation {
@@ -430,7 +439,58 @@ impl SealController {
         }
         if !inner
             .recovery_ceremony_id
-            .is_some_and(|expected| constant_time_equal(&expected, &supplied_ceremony_id))
+            .is_some_and(|expected| constant_time_equal(&expected, &expected_ceremony_id))
+        {
+            return Err(SealError::UnsealRejected);
+        }
+
+        let next = next_generation(inner.generation)?;
+        inner.active_root = Some(recovered);
+        inner.status = SealStatus::Unsealed;
+        inner.generation = next;
+        Ok(())
+    }
+
+    /// Explicitly invokes a caller-selected unseal provider. The default
+    /// synchronous unseal method always uses Shamir 2-of-3; alternate providers
+    /// are never selected implicitly and errors never trigger a fallback.
+    ///
+    /// The provider must authenticate the bound ceremony id. A provider error,
+    /// timeout, cancellation or empty result leaves the controller Sealed.
+    pub async fn unseal_with(
+        &self,
+        unsealer: &dyn Unsealer,
+        source: UnsealSource<'_>,
+    ) -> Result<(), SealError> {
+        let (expected_ceremony_id, expected_generation) = {
+            let inner = self.lock();
+            if inner.status != SealStatus::Sealed {
+                return Err(SealError::InvalidStateTransition);
+            }
+            (
+                inner
+                    .recovery_ceremony_id
+                    .ok_or(SealError::UnsealRejected)?,
+                inner.generation,
+            )
+        };
+
+        let request = UnsealRequest::from_source(expected_ceremony_id, source);
+        let recovered = unsealer
+            .unseal(request)
+            .await
+            .map_err(|_| SealError::UnsealRejected)?;
+        if recovered.is_empty() {
+            return Err(SealError::UnsealRejected);
+        }
+
+        let mut inner = self.lock();
+        if inner.status != SealStatus::Sealed || inner.generation != expected_generation {
+            return Err(SealError::ConcurrentTransition);
+        }
+        if !inner
+            .recovery_ceremony_id
+            .is_some_and(|expected| constant_time_equal(&expected, &expected_ceremony_id))
         {
             return Err(SealError::UnsealRejected);
         }
@@ -794,10 +854,9 @@ mod tests {
             .issue_bootstrap_token(Duration::from_secs(60))
             .expect("issue token");
         let root_shares = shares(b"synthetic root for recovery test");
-        let other_shares = shares(b"different synthetic ceremony");
 
         assert_eq!(
-            controller.bootstrap(&token, &other_shares[..2]),
+            controller.bootstrap(&token, &root_shares[..1]),
             Err(SealError::BootstrapRejected)
         );
         assert_eq!(controller.snapshot().status, SealStatus::Uninitialized);
@@ -844,8 +903,8 @@ mod tests {
             Err(SealError::InvalidStateTransition)
         );
         controller
-            .unseal(&root_shares[1..4])
-            .expect("unseal with another threshold subset");
+            .unseal(&root_shares[1..3])
+            .expect("unseal with another 2-of-3 subset");
         assert_eq!(
             controller
                 .with_root_key(|bytes| bytes.to_vec())
@@ -965,9 +1024,15 @@ mod tests {
             controller
                 .bootstrap(&token, &root_shares[..3])
                 .expect("bootstrap generated shares");
+            let first = length % 3;
+            let second = (first + 1) % 3;
+            let selected = [
+                RecoveryShare::decode(root_shares[first].as_bytes()).unwrap(),
+                RecoveryShare::decode(root_shares[second].as_bytes()).unwrap(),
+            ];
             controller
-                .unseal(&root_shares[(length % 3)..(length % 3 + 3)])
-                .expect("unseal generated shares");
+                .unseal(&selected)
+                .expect("unseal generated 2-of-3 shares");
             assert_eq!(
                 controller.with_root_key(|bytes| bytes.to_vec()).unwrap(),
                 root
