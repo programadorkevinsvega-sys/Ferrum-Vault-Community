@@ -4,9 +4,9 @@ Thank you for your interest in Ferrum Vault Community.
 
 ## Current contribution scope
 
-The project is in pre-implementation architecture foundations. At this stage, documentation corrections and clarifications are the appropriate contribution scope. The repository does not yet contain a runnable implementation, so please do not present proposed behavior as implemented functionality.
+The project is in early implementation of Phase 1. Cryptographic, recovery and seal-lifecycle code is being added incrementally under the public roadmap. Changes must stay within the approved phase, include tests and fuzz targets for new security boundaries, update affected documentation, and must not present an isolated crate as a production-ready service.
 
-Before proposing a significant architectural or security change, open a discussion or issue describing the problem and the intended public impact. Do not add cryptographic implementations, dependencies, generated binaries or claims of production readiness without explicit maintainer direction.
+Before proposing a significant architectural or security change, open a discussion or issue describing the problem and the intended public impact. Do not introduce new cryptographic algorithms, unapproved dependencies, generated binaries, unresolved security parameters or production-readiness claims. Preserve owner-approved decisions and leave explicitly pending parameters unresolved.
 
 ## Licensing and provenance
 

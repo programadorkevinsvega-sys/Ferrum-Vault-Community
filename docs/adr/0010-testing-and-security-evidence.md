@@ -15,3 +15,20 @@ The planned CI quality gates include formatting, clippy with warnings denied, te
 ## Consequences
 
 Tests must not be weakened or removed merely to obtain a green pipeline. Flaky or excluded tests and their reasons must be documented. Every security claim must link to reproducible evidence; passing CI is not an external security audit.
+
+
+## Phase 1.4 evidence and technique boundaries
+
+The initial `ferrum-seal` lifecycle implementation records 12 unit tests for bootstrap-token lifetime/expiry/replay, FRS1 ceremony binding, rejection paths, seal/unseal root availability, concurrent transitions and panic recovery. The approved root-operation quorum and derived-credential audit helper add eight tests, bringing the current `ferrum-seal` suite to 20 passing tests on the exact PR head. Deterministic root-length and valid-share-subset sweeps are not a substitute for proptest. The `seal_bootstrap_transitions` libFuzzer target generates synthetic secrets/shares at runtime and mutates recovery inputs and token encodings; its committed corpus must not contain valid shares, root material or bootstrap tokens.
+
+Exact-head PR CI evidence is recorded in [ROADMAP Phase 1.4](../../ROADMAP.md): cross-platform and MSRV validation, Miri for the pure-Rust KMP parser, and bounded fuzz smoke campaigns. Miri does not exercise AWS-LC FFI or establish memory safety of external code. No seal-specific Loom model, measured coverage result, Criterion benchmark, durable-store failure injection, or service-level crash/restart test is claimed in this phase. Add these techniques when the relevant synchronization/storage/service boundaries exist, or document a reviewed reason for any future exclusion.
+
+
+## Phase 1.4 root-quorum and audit tests
+
+The seal controller now requires an explicitly configured `RootQuorumPolicy`; there is no `Default`. The owner-approved configuration is 2-of-3 for generate-root, root rotation and root revocation. Unit coverage rejects absent/invalid policy, fewer than M shares, duplicate participants, modified share payloads and shares from another FRS1 ceremony; it accepts two distinct valid shares. The root-quorum fuzz target generates synthetic FRS1 shares at runtime and exercises the same positive and negative paths. It does not persist valid fragments or emit them to logs/artifacts.
+
+Derived-credential revocation uses a caller-provided audit sink, does not require root fragments, records request and outcome events with a domain-separated credential-reference fingerprint, and does not invoke the revocation callback when the initial audit write fails. Durable audit delivery and atomic audit/state mutation remain service/storage integration requirements.
+
+
+The exact implementation evidence at `762bbe3fea4e6b8d572f8688df185e21005dd5dc` is CI run [#43542327701](https://github.com/programadorkevinsvega-sys/Ferrum-Vault-Community/actions/runs/43542327701) (16/16 jobs passed, including all four platforms, MSRV, Miri, nine fuzz smoke targets and public Markdown/patch gates) and Gitleaks run [#43542327705](https://github.com/programadorkevinsvega-sys/Ferrum-Vault-Community/actions/runs/43542327705) (full fetched Git history/refs passed). The `root_quorum_authorization` 60-second campaign passed with runtime-generated synthetic FRS1 material. These results apply to that code commit; this section's subsequent documentation-only commit will be revalidated independently.

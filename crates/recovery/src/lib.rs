@@ -85,6 +85,16 @@ impl RecoveryShare {
         &self.encoded
     }
 
+    /// Returns the public, random ceremony identifier carried by FRS1.
+    ///
+    /// This identifier is non-secret metadata used to bind the configured seal
+    /// lifecycle to the same recovery ceremony. It does not reveal share bytes.
+    pub fn ceremony_id(&self) -> [u8; 16] {
+        let mut identifier = [0_u8; 16];
+        identifier.copy_from_slice(&self.encoded[8..24]);
+        identifier
+    }
+
     /// Returns the public participant identifier encoded in the share.
     pub fn participant_id(&self) -> u8 {
         self.encoded[HEADER_LEN]
@@ -570,6 +580,18 @@ mod tests {
         let debug = format!("{share:?}");
         assert!(debug.contains("redacted"));
         assert!(!debug.contains("FRS1"));
+    }
+
+    #[test]
+    fn ceremony_identifier_is_consistent_and_public_metadata_only() {
+        let first =
+            deterministic_split(&synthetic_secret(24, 0x71), RecoveryPolicy::default(), 0x71);
+        let identifier = first[0].ceremony_id();
+        assert!(first.iter().all(|share| share.ceremony_id() == identifier));
+
+        let second =
+            deterministic_split(&synthetic_secret(24, 0x72), RecoveryPolicy::default(), 0x72);
+        assert_ne!(identifier, second[0].ceremony_id());
     }
 
     #[test]

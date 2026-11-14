@@ -4,7 +4,7 @@ Ferrum is a project in development for secrets management, encryption services a
 
 ## Project status
 
-**Pre-implementation / architecture foundations.** The Community repository currently contains public project documentation only. It does not yet contain a Rust implementation, Cargo manifests, a runnable server, a CLI, or a production-ready release.
+**Early implementation / not production-ready.** The Community repository now contains isolated Rust crates for the AWS-LC cryptographic boundary, offline Shamir recovery and the Phase 1.4 seal/bootstrap state machine. It does not yet contain a complete runtime, durable seal-state backend, server/API or CLI. Do not use it to store, protect or process production secrets.
 
 Do not use this project to store, protect or process production secrets. It has not been independently audited or FIPS validated.
 

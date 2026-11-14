@@ -11,6 +11,7 @@ cargo-fuzz = true
 [dependencies]
 ferrum-crypto = { path = "../crates/crypto" }
 ferrum-recovery = { path = "../crates/recovery" }
+ferrum-seal = { path = "../crates/seal" }
 libfuzzer-sys = "=0.4.13"
 rand = { version = "=0.10.3", default-features = false, features = ["std_rng"] }
 rand_core = "=0.10.1"
@@ -67,3 +68,16 @@ bench = false
 [workspace]
 members = []
 resolver = "3"
+
+[[bin]]
+name = "seal_bootstrap_transitions"
+path = "fuzz_targets/seal_bootstrap_transitions.rs"
+test = false
+doc = false
+bench = false
+[[bin]]
+name = "root_quorum_authorization"
+path = "fuzz_targets/root_quorum_authorization.rs"
+test = false
+doc = false
+bench = false

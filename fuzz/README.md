@@ -16,6 +16,8 @@ that introduces the relevant parser, envelope or protocol; do not defer fuzzing.
 | `key_context_mutations` | Mutating the caller scope after AES-GCM wrapping always fails authentication. |
 | `recovery_share_decode` | Arbitrary FRS1 input never panics; accepted envelopes remain byte-for-byte canonical. |
 | `recovery_share_mutations` | Mutated Shamir shares either fail closed or reconstruct only the original test input. |
+| `seal_bootstrap_transitions` | Arbitrary bootstrap token encodings and malformed/replayed bootstrap attempts never panic or move an uninitialized controller into an initialized state. |
+| `root_quorum_authorization` | Root generate/rotate/revoke callbacks require an explicit 2-of-3 FRS1 policy and reject one, duplicate, corrupt, mixed-ceremony or arbitrary fragments. All secret values are generated at runtime. |
 
 The AES-GCM primitive's `SealedPayload` keeps the nonce at `[u8; 12]` and
 ciphertext/tag bytes separately. The KMP layer adds the serialized FVK1
@@ -39,13 +41,15 @@ cargo +nightly-2026-11-12 fuzz run wrapped_key_decode -- -max_total_time=300 -ma
 cargo +nightly-2026-11-12 fuzz run key_context_mutations -- -max_total_time=300 -max_len=65536 -timeout=10
 cargo +nightly-2026-11-12 fuzz run recovery_share_decode -- -max_total_time=300 -max_len=65536 -timeout=10
 cargo +nightly-2026-11-12 fuzz run recovery_share_mutations -- -max_total_time=300 -max_len=65536 -timeout=10
+cargo +nightly-2026-11-12 fuzz run seal_bootstrap_transitions -- -max_total_time=300 -max_len=65536 -timeout=10
+cargo +nightly-2026-11-12 fuzz run root_quorum_authorization -- -max_total_time=300 -max_len=65536 -timeout=10
 ```
 
 ## CI policy
 
 - Pull requests and pushes to `main`: 60-second fuzz smoke test per target.
 - Weekly scheduled workflow and manual dispatch: five minutes per target.
-- Fuzzing runs on Linux, where the libFuzzer sanitizer runtime is supported.
+- Fuzzing runs on Linux, where the libFuzzer sanitizer runtime is supported. The seal and root-quorum targets create synthetic recovery shares at runtime; never commit real ceremony shares or bootstrap credentials.
 - Failing inputs are retained as workflow artifacts. Minimize a finding, add a
   deterministic regression test, fix the defect, and keep the minimized regression
   fixture in version control when safe and useful.

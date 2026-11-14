@@ -229,6 +229,7 @@ version = "0.0.0"
 dependencies = [
  "ferrum-crypto",
  "ferrum-recovery",
+ "ferrum-seal",
  "libfuzzer-sys",
  "rand",
  "rand_core",
@@ -242,6 +243,15 @@ dependencies = [
  "rand",
  "rand_core",
  "vsss-rs",
+ "zeroize",
+]
+
+[[package]]
+name = "ferrum-seal"
+version = "0.1.0"
+dependencies = [
+ "aws-lc-rs",
+ "ferrum-recovery",
  "zeroize",
 ]
 

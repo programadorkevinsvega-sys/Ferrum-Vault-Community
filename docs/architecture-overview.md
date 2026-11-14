@@ -20,4 +20,4 @@ Community contains only public code, public APIs, documentation and approved ext
 
 ## Current implementation status
 
-This repository is currently documentation-only. It has no Cargo manifests, Rust implementation, server, CLI or production release. The principles above are design goals, not claims about working software.
+This repository contains the early Rust implementation of three isolated crates: `ferrum-crypto` (Phase 1.1/1.2 provider and KMP contract), `ferrum-recovery` (Phase 1.3 offline Shamir primitives), and `ferrum-seal` (Phase 1.4 process-local seal/bootstrap state machine, still under implementation and CI validation). It does not yet contain a durable seal-state backend, complete key hierarchy, KMS auto-unseal adapter, storage barrier, server/API or CLI. The principles above are design constraints, not a claim of production readiness.
