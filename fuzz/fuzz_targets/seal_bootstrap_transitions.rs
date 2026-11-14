@@ -21,7 +21,7 @@ fuzz_target!(|data: &[u8]| {
 
     // Generate all secrets and shares at runtime; the corpus contains no valid
     // key, ceremony share or bootstrap credential.
-    let Ok(shares) = generate_secret_shares(32, RecoveryPolicy::default()) else {
+    let Ok(shares) = generate_secret_shares(32, RecoveryPolicy::new(2, 3).expect("2-of-3 root policy")) else {
         return;
     };
     let Ok(token) = controller.issue_bootstrap_token(Duration::from_secs(60)) else {

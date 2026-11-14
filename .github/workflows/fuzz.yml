@@ -30,6 +30,7 @@ jobs:
           - recovery_share_mutations
           - seal_bootstrap_transitions
           - root_quorum_authorization
+          - shamir_unsealer
     steps:
       - name: Check out repository
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1

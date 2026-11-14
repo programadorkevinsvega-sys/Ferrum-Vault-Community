@@ -4,7 +4,7 @@
 
 This document records the Community Phase 1.4 implementation boundary. The crate implements a process-local lifecycle state machine and bootstrap/unseal handling. It is not a deployed service, durable state store, HTTP API or production authorization integration.
 
-The approved root ceremony remains offline and Shamir-based. The service never persists recovery shares. Bootstrap and later unseal operations accept a threshold set of FRS1 shares, reconstruct the secret in zeroizing memory, and verify the FRS1 integrity tag before committing a state transition.
+The approved root ceremony remains offline and Shamir-based. The service never persists recovery shares. Bootstrap and the mandatory default unseal adapter accept only an exact 2-of-3 FRS1 share set, reconstruct the secret in zeroizing memory, and verify the FRS1 integrity tag before committing a state transition. The generic offline recovery crate retains its independent 5-of-3 default; it is not an unseal fallback.
 
 ## State model
 
@@ -12,7 +12,9 @@ The approved root ceremony remains offline and Shamir-based. The service never p
 |---|---|---|---|
 | Uninitialized | issue bootstrap token | Uninitialized | No active token; no token consumed |
 | Uninitialized | bootstrap | Sealed | Valid, unexpired token and valid threshold from one FRS1 ceremony |
-| Sealed | unseal | Unsealed | Shares reconstruct the same configured ceremony |
+| Sealed | default unseal | Unsealed | Two of three distinct shares reconstruct the same configured ceremony |
+| Sealed | explicit optional-provider unseal | Unsealed | Caller selects an alternate Unsealer; provider authenticates the expected ceremony |
+| Sealed | provider failure | Sealed | No fallback; operator must explicitly select another recovery path |
 | Unsealed | seal | Sealed | Active root buffer exists |
 
 All other transitions fail closed. The controller serializes updates and checks a generation counter after recovery work so simultaneous bootstrap or unseal attempts cannot both commit.
@@ -29,7 +31,7 @@ The token object is non-Clone and has no serialization or Display implementation
 
 FRS1 already contains a random 128-bit ceremony identifier in its authenticated header. The recovery type now exposes only this non-secret identifier as metadata. Bootstrap checks that all supplied shares use the same identifier, reconstructs the root through ferrum-recovery, and relies on its HMAC verification before recording the identifier.
 
-The controller does not retain the reconstructed root during bootstrap. It records only the ceremony identifier. During unseal it requires the same identifier, reconstructs the root again, verifies the FRS1 integrity tag, and stores the recovered root in a Zeroizing buffer.
+The controller does not retain the reconstructed root during bootstrap. It records only the ceremony identifier. During default unseal the mandatory ShamirUnsealer requires exact 2-of-3 root policy, the same ceremony identifier, unique participants and valid FRS1 integrity, then stores the recovered root in a Zeroizing buffer. An explicitly selected alternate provider must authenticate the same expected ceremony identifier.
 
 This avoids inventing a second root fingerprint or a new cryptographic format. It does not provide custodian identity or per-share signatures; those limitations remain as documented by the Phase 1.3 recovery runbook.
 
@@ -64,3 +66,16 @@ The `ferrum-seal` crate has 20 passing unit tests on the validated code head. Th
 The `seal_bootstrap_transitions` and `root_quorum_authorization` libFuzzer targets both passed their 60-second PR smoke campaigns. They use synthetic secrets/shares generated at runtime, mutate FRS1 data and token encodings, and exercise fail-closed transitions and quorum rejection. No valid ceremony shares, root keys or bootstrap credentials are committed to the repository or included in logs/CI artifacts.
 
 Exact-head CI [#43542327701](https://github.com/programadorkevinsvega-sys/Ferrum-Vault-Community/actions/runs/43542327701) passed all 16 jobs and Gitleaks [#43542327705](https://github.com/programadorkevinsvega-sys/Ferrum-Vault-Community/actions/runs/43542327705) passed on code head `762bbe3fea4e6b8d572f8688df185e21005dd5dc`. The 16 CI jobs comprise four Rust platform jobs, MSRV, Miri, nine fuzz campaigns and public repository quality gates. The run does not establish service-level crash/restart behavior, durable audit or measured coverage.
+
+
+## Phase 1.5: Unsealer port and optional KMS
+
+The object-safe asynchronous `Unsealer` port separates the seal controller from unseal mechanisms. `SealController::unseal` always invokes ShamirUnsealer with exactly 2-of-3. One share, duplicate participants, corrupt payloads, mixed ceremonies, another ceremony id and the generic 5-of-3 recovery policy are rejected. There is no provider auto-detection or fallback.
+
+An alternate provider can be invoked only through the explicit `unseal_with` call. The `aws-kms` feature is opt-in and disabled by default; it links no AWS SDK and obtains no credentials. The host application injects a KMS client. Its ciphertext is bound to a SHA-256 fingerprint of canonical FVC1 context containing tenant=root, purpose=seal-root and the public ceremony identifier. Provider failure, denial, timeout, invalid metadata or context mismatch leaves the controller Sealed. Manual Shamir recovery after such a failure is a separate explicit operator action.
+
+**Privilege risk:** any principal with `kms:Decrypt` on the configured symmetric KMS key and access to the wrapped-root ciphertext can decrypt it and unseal without presenting Shamir shares. This is an alternate trust path, not equivalent to Shamir custody. Treat `kms:Decrypt` as a high-impact privilege: restrict it to a dedicated runtime identity, constrain it with expected encryption-context policy conditions where possible, monitor Decrypt events and protect CloudTrail. Encryption context is non-secret and logged in plaintext, so Ferrum sends only a SHA-256 context fingerprint; see [AWS KMS encryption-context guidance](https://docs.aws.amazon.com/kms/latest/developerguide/encrypt_context.html).
+
+**Independent root-operation gate:** KMS unseal never configures or satisfies RootQuorumPolicy. `generate-root`, root rotation and root revocation still require the explicitly configured 2-of-3 root quorum. Missing or invalid configuration fails closed. Derived-credential revocation remains separately audited without root quorum.
+
+KMS wrapping metadata is currently an in-memory type, not a durable serialized format. Persistence and crash/restart handling remain Phase 1.7 work. Fake KMS tests are entirely in-memory and use synthetic root material; they do not validate real AWS credentials, IAM deployment policy or live network behavior.

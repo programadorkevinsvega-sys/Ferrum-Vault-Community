@@ -1,0 +1,23 @@
+{
+  "Version": "2012-10-17",
+  "Statement": [
+    {
+      "Sid": "ReadFerrumKmsKeyPolicy",
+      "Effect": "Allow",
+      "Action": "kms:GetKeyPolicy",
+      "Resource": "REPLACE_WITH_FULL_KMS_KEY_ARN"
+    },
+    {
+      "Sid": "LookupRegionalCloudTrailEventHistory",
+      "Effect": "Allow",
+      "Action": "cloudtrail:LookupEvents",
+      "Resource": "*"
+    },
+    {
+      "Sid": "SimulateRuntimeKmsIdentityPermissions",
+      "Effect": "Allow",
+      "Action": "iam:SimulatePrincipalPolicy",
+      "Resource": "*"
+    }
+  ]
+}
