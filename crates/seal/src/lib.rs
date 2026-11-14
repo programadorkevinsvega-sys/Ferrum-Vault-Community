@@ -1045,11 +1045,7 @@ mod tests {
             Err(SealError::InvalidQuorumPolicy)
         );
         assert_eq!(
-            controller.with_root_quorum(
-                RootQuorumOperation::RotateRoot,
-                &root_shares[..2],
-                |_| ()
-            ),
+            controller.with_root_quorum(RootQuorumOperation::RotateRoot, &root_shares[..2], |_| ()),
             Err(SealError::QuorumNotConfigured)
         );
     }
