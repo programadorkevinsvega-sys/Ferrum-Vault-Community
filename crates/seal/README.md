@@ -20,3 +20,12 @@ The crate does not implement an HTTP/API layer, audit persistence, throttling/ra
 The generate-root workflow is deliberately not implemented. ADR-0014 leaves its exact quorum pending an owner decision. No default, threshold or bypass is supplied by this crate.
 
 See [the seal lifecycle security notes](../../docs/security/seal-lifecycle.md).
+
+
+## Root-operation quorum
+
+The controller has no default privileged-operation quorum. The owner-approved policy is explicitly configured as `RootQuorumPolicy::new(2, 3)` and applied to generate-root, root rotation and root revocation. The FRS1 root-share policy must match that exact configuration. Missing/invalid configuration, fewer than two shares, duplicates, corruption and mixed ceremonies fail closed. The generic recovery crate's 5-of-3 default is separate and is not a fallback.
+
+Use `with_root_quorum` as the common authorization gate; it validates the fragment set, drops reconstructed material before the callback and gives the callback only public operation context. The callback runs under the controller lock and must not re-enter it. This is a process-local authorization primitive; durable root mutation and persistent audit are not implemented here.
+
+Derived-credential revocation does not use root quorum. Route it through `revoke_derived_credential` with a caller-provided audit sink. The raw credential reference is not emitted; only a domain-separated fingerprint appears in audit events. If the initial audit write fails, the revocation callback is not executed.

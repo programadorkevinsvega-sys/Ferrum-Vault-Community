@@ -75,3 +75,9 @@ path = "fuzz_targets/seal_bootstrap_transitions.rs"
 test = false
 doc = false
 bench = false
+[[bin]]
+name = "root_quorum_authorization"
+path = "fuzz_targets/root_quorum_authorization.rs"
+test = false
+doc = false
+bench = false

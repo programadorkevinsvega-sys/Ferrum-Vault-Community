@@ -45,9 +45,17 @@ The current controller uses process-local memory. It is not restart-safe or mult
 
 No API-level rate limiting or durable audit sink exists yet. A service integration must add abuse throttling, fail-closed audit and generic external errors without logging tokens, shares or root material.
 
-## Generate-root decision
+## Root-operation quorum and derived-credential revocation
 
-ADR-0014 still leaves the numeric M/N quorum and its operation scope unconfigured. This implementation does not expose a generate-root endpoint, choose a threshold, derive a default, or supply a permissive implementation. The operation must fail closed while quorum policy is absent or invalid. The recovery crate's separate 5/3 default must not be reused as an implicit generate-root policy. Any future quorum implementation must reject M−1 distinct fragments, accept M valid distinct fragments from one ceremony, and reject duplicates and corrupted fragments. Secret fragments, root material and bootstrap credentials must never enter the repository, logs, CI output, variables or artifacts; tests/fuzzers must generate synthetic values at runtime. Whether the same quorum applies to rotation or revocation remains unspecified. See ADR-0014. This workflow remains blocked until the owner supplies numeric M/N and the exact operation scope.
+The owner has approved an explicit **2-of-3** quorum for `generate-root`, root rotation and root revocation. Derived-credential revocation does not require root quorum, but must be audited.
+
+Configure the root controller explicitly with `RootQuorumPolicy::new(2, 3)`. `SealController::new()` installs no quorum policy. Missing configuration, M < 2, M > N, or a root FRS1 set whose encoded policy does not match the explicit configuration causes a fail-closed rejection. The general `ferrum-recovery` 5-of-3 default remains separate; it is not an implicit root-operation quorum.
+
+`with_root_quorum` is the shared gate for the three root operations. It verifies at least M and at most N shares, exact FRS1 policy, the currently bound ceremony identifier, unique participant IDs and the FRS1 integrity tag. One fragment is insufficient; two distinct valid fragments work. Duplicate, corrupted and cross-ceremony fragments are rejected. It drops the reconstructed secret before invoking the operation callback and gives the callback only non-secret operation context. The callback runs under the controller's state lock and must not re-enter the controller. This is an in-process authorization boundary, not yet a durable root-mutation service or HTTP endpoint.
+
+The `revoke_derived_credential` helper does not accept or request root fragments. It requires a caller-provided `AuditSink`, records a request before invoking the revocation callback, and records success/failure using a domain-separated fingerprint of the credential reference (never the raw reference). If the audit sink cannot accept the request event, the revocation callback does not run. A durable audit implementation belongs to the service/audit phase.
+
+Root fragments, root material and bootstrap credentials must never enter source control, logs, CI output, CI variables or CI artifacts. Tests and fuzzing generate synthetic material at runtime only. See ADR-0014.
 
 ## Verification
 
