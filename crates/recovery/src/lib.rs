@@ -10,7 +10,7 @@
 use std::collections::HashSet;
 use std::fmt;
 
-use aws_lc_rs::hmac::{self, Key, HMAC_SHA256};
+use aws_lc_rs::hmac::{self, HMAC_SHA256, Key};
 use rand::rngs::{StdRng, SysRng};
 use rand_core::{CryptoRng, Rng, SeedableRng};
 use vsss_rs::Gf256;
@@ -140,7 +140,9 @@ impl fmt::Display for RecoveryError {
             Self::InsufficientShares => "insufficient recovery shares",
             Self::TooManyShares => "too many recovery shares for the encoded policy",
             Self::DuplicateParticipant => "duplicate recovery participant",
-            Self::MismatchedCeremony => "recovery shares belong to different ceremonies or policies",
+            Self::MismatchedCeremony => {
+                "recovery shares belong to different ceremonies or policies"
+            },
             Self::AuthenticationFailed => "recovery-share integrity verification failed",
             Self::ReconstructionFailed => "recovery shares could not be reconstructed",
         })
@@ -282,23 +284,23 @@ pub fn recover_secret(shares: &[RecoveryShare]) -> Result<Zeroizing<Vec<u8>>, Re
         raw_shares.push(parts.raw_share.to_vec());
     }
 
-    let combined = Gf256::combine_bytes(&raw_shares)
-        .map_err(|_| RecoveryError::ReconstructionFailed)?;
+    let combined =
+        Gf256::combine_bytes(&raw_shares).map_err(|_| RecoveryError::ReconstructionFailed)?;
     let combined = Zeroizing::new(combined);
 
-    let secret_len = usize::try_from(first_parts.secret_len)
-        .map_err(|_| RecoveryError::MalformedShare)?;
-    let expected_payload_len = usize::try_from(first_parts.payload_len)
-        .map_err(|_| RecoveryError::MalformedShare)?;
+    let secret_len =
+        usize::try_from(first_parts.secret_len).map_err(|_| RecoveryError::MalformedShare)?;
+    let expected_payload_len =
+        usize::try_from(first_parts.payload_len).map_err(|_| RecoveryError::MalformedShare)?;
     if combined.len() != expected_payload_len || combined.len() != secret_len + CHECK_KEY_LEN {
         return Err(RecoveryError::ReconstructionFailed);
     }
 
     let (root_secret, check_key) = combined.split_at(secret_len);
     let key = Key::new(HMAC_SHA256, check_key);
-    let mut authenticated = Zeroizing::new(
-        Vec::with_capacity(MAC_DOMAIN.len() + first_parts.header.len() + root_secret.len()),
-    );
+    let mut authenticated = Zeroizing::new(Vec::with_capacity(
+        MAC_DOMAIN.len() + first_parts.header.len() + root_secret.len(),
+    ));
     authenticated.extend_from_slice(MAC_DOMAIN);
     authenticated.extend_from_slice(first_parts.header);
     authenticated.extend_from_slice(root_secret);
@@ -309,11 +311,7 @@ pub fn recover_secret(shares: &[RecoveryShare]) -> Result<Zeroizing<Vec<u8>>, Re
     Ok(Zeroizing::new(root_secret.to_vec()))
 }
 
-fn calculate_tag(
-    header: &[u8],
-    root_secret: &[u8],
-    check_key: &[u8],
-) -> [u8; TAG_LEN] {
+fn calculate_tag(header: &[u8], root_secret: &[u8], check_key: &[u8]) -> [u8; TAG_LEN] {
     let key = Key::new(HMAC_SHA256, check_key);
     let mut authenticated = Zeroizing::new(Vec::with_capacity(
         MAC_DOMAIN.len() + header.len() + root_secret.len(),
@@ -380,8 +378,8 @@ fn parse_share(input: &[u8]) -> Result<ShareParts<'_>, RecoveryError> {
 #[cfg(test)]
 mod tests {
     use super::{
-        generate_secret_shares, recover_secret, split_secret, split_secret_with_rng,
-        RecoveryError, RecoveryPolicy, RecoveryShare,
+        RecoveryError, RecoveryPolicy, RecoveryShare, generate_secret_shares, recover_secret,
+        split_secret, split_secret_with_rng,
     };
     use rand::rngs::StdRng;
     use rand_core::SeedableRng;
@@ -461,7 +459,8 @@ mod tests {
 
     #[test]
     fn fewer_than_threshold_shares_are_rejected() {
-        let shares = deterministic_split(&synthetic_secret(32, 0x42), RecoveryPolicy::default(), 0x42);
+        let shares =
+            deterministic_split(&synthetic_secret(32, 0x42), RecoveryPolicy::default(), 0x42);
         let selected = [copy_share(&shares[0]), copy_share(&shares[1])];
         assert_eq!(
             recover_secret(&selected),
@@ -471,8 +470,13 @@ mod tests {
 
     #[test]
     fn duplicate_participant_ids_are_rejected() {
-        let shares = deterministic_split(&synthetic_secret(32, 0x43), RecoveryPolicy::default(), 0x43);
-        let selected = [copy_share(&shares[0]), copy_share(&shares[0]), copy_share(&shares[2])];
+        let shares =
+            deterministic_split(&synthetic_secret(32, 0x43), RecoveryPolicy::default(), 0x43);
+        let selected = [
+            copy_share(&shares[0]),
+            copy_share(&shares[0]),
+            copy_share(&shares[2]),
+        ];
         assert_eq!(
             recover_secret(&selected),
             Err(RecoveryError::DuplicateParticipant)
@@ -481,8 +485,10 @@ mod tests {
 
     #[test]
     fn share_from_another_ceremony_is_rejected() {
-        let first = deterministic_split(&synthetic_secret(32, 0x44), RecoveryPolicy::default(), 0x44);
-        let second = deterministic_split(&synthetic_secret(32, 0x45), RecoveryPolicy::default(), 0x45);
+        let first =
+            deterministic_split(&synthetic_secret(32, 0x44), RecoveryPolicy::default(), 0x44);
+        let second =
+            deterministic_split(&synthetic_secret(32, 0x45), RecoveryPolicy::default(), 0x45);
         let selected = [
             copy_share(&first[0]),
             copy_share(&first[1]),
@@ -496,7 +502,8 @@ mod tests {
 
     #[test]
     fn mutated_share_data_fails_integrity_verification() {
-        let shares = deterministic_split(&synthetic_secret(32, 0x46), RecoveryPolicy::default(), 0x46);
+        let shares =
+            deterministic_split(&synthetic_secret(32, 0x46), RecoveryPolicy::default(), 0x46);
         let mut tampered_bytes = shares[0].as_bytes().to_vec();
         let last = tampered_bytes.len() - 1;
         tampered_bytes[last] ^= 0x01;
@@ -516,7 +523,9 @@ mod tests {
 
     #[test]
     fn frs1_parser_rejects_every_truncation_and_trailing_data() {
-        let share = deterministic_split(&synthetic_secret(32, 0x47), RecoveryPolicy::default(), 0x47).remove(0);
+        let share =
+            deterministic_split(&synthetic_secret(32, 0x47), RecoveryPolicy::default(), 0x47)
+                .remove(0);
         let encoded = share.as_bytes();
         for end in 0..encoded.len() {
             assert!(
@@ -534,7 +543,9 @@ mod tests {
 
     #[test]
     fn parser_rejects_unknown_version_and_invalid_identifiers() {
-        let share = deterministic_split(&synthetic_secret(32, 0x48), RecoveryPolicy::default(), 0x48).remove(0);
+        let share =
+            deterministic_split(&synthetic_secret(32, 0x48), RecoveryPolicy::default(), 0x48)
+                .remove(0);
         let mut unknown = share.as_bytes().to_vec();
         unknown[4..6].copy_from_slice(&2_u16.to_be_bytes());
         assert_eq!(
@@ -553,7 +564,9 @@ mod tests {
 
     #[test]
     fn debug_output_never_contains_encoded_share_material() {
-        let share = deterministic_split(&synthetic_secret(16, 0x49), RecoveryPolicy::default(), 0x49).remove(0);
+        let share =
+            deterministic_split(&synthetic_secret(16, 0x49), RecoveryPolicy::default(), 0x49)
+                .remove(0);
         let debug = format!("{share:?}");
         assert!(debug.contains("redacted"));
         assert!(!debug.contains("FRS1"));
