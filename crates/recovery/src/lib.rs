@@ -159,7 +159,7 @@ pub fn split_secret(
     secret: &[u8],
     policy: RecoveryPolicy,
 ) -> Result<Vec<RecoveryShare>, RecoveryError> {
-    let mut operating_system_rng = SysRng::default();
+    let mut operating_system_rng = SysRng;
     let mut rng = StdRng::try_from_rng(&mut operating_system_rng)
         .map_err(|_| RecoveryError::RandomnessUnavailable)?;
     split_secret_with_rng(secret, policy, &mut rng)
@@ -177,7 +177,7 @@ pub fn generate_secret_shares(
     }
     u32::try_from(secret_len).map_err(|_| RecoveryError::SecretTooLarge)?;
 
-    let mut operating_system_rng = SysRng::default();
+    let mut operating_system_rng = SysRng;
     let mut rng = StdRng::try_from_rng(&mut operating_system_rng)
         .map_err(|_| RecoveryError::RandomnessUnavailable)?;
     let mut secret = Zeroizing::new(vec![0_u8; secret_len]);
