@@ -163,6 +163,26 @@ pub fn split_secret(
     split_secret_with_rng(secret, policy, &mut rng)
 }
 
+/// Generates root material of the caller-selected length from an OS-seeded
+/// CSPRNG and returns only its Shamir shares. No default root size is imposed:
+/// the caller must use the size approved for the key hierarchy being created.
+pub fn generate_secret_shares(
+    secret_len: usize,
+    policy: RecoveryPolicy,
+) -> Result<Vec<RecoveryShare>, RecoveryError> {
+    if secret_len == 0 {
+        return Err(RecoveryError::EmptySecret);
+    }
+    u32::try_from(secret_len).map_err(|_| RecoveryError::SecretTooLarge)?;
+
+    let mut operating_system_rng = SysRng::default();
+    let mut rng = StdRng::try_from_rng(&mut operating_system_rng)
+        .map_err(|_| RecoveryError::RandomnessUnavailable)?;
+    let mut secret = Zeroizing::new(vec![0_u8; secret_len]);
+    rng.fill_bytes(&mut secret);
+    split_secret_with_rng(&secret, policy, &mut rng)
+}
+
 /// Splits root material with a caller-supplied cryptographically secure RNG.
 ///
 /// This form supports controlled offline ceremony tooling and deterministic
@@ -353,8 +373,8 @@ fn parse_share(input: &[u8]) -> Result<ShareParts<'_>, RecoveryError> {
 #[cfg(test)]
 mod tests {
     use super::{
-        recover_secret, split_secret, split_secret_with_rng, RecoveryError, RecoveryPolicy,
-        RecoveryShare,
+        generate_secret_shares, recover_secret, split_secret, split_secret_with_rng,
+        RecoveryError, RecoveryPolicy, RecoveryShare,
     };
     use rand::rngs::StdRng;
     use rand_core::SeedableRng;
@@ -519,5 +539,25 @@ mod tests {
             RecoveryShare::decode(selected[2].as_bytes()).unwrap(),
         ];
         assert_eq!(&*recover_secret(&copies).unwrap(), b"root");
+    }
+
+    #[test]
+    fn ceremony_generation_returns_only_recoverable_shares() {
+        let shares = generate_secret_shares(32, RecoveryPolicy::default()).unwrap();
+        assert_eq!(shares.len(), 5);
+        let selected = [
+            copy_share(&shares[0]),
+            copy_share(&shares[2]),
+            copy_share(&shares[4]),
+        ];
+        assert_eq!(recover_secret(&selected).unwrap().len(), 32);
+    }
+
+    #[test]
+    fn ceremony_generation_rejects_zero_length() {
+        assert_eq!(
+            generate_secret_shares(0, RecoveryPolicy::default()),
+            Err(RecoveryError::EmptySecret)
+        );
     }
 }
