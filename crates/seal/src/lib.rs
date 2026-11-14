@@ -1129,11 +1129,9 @@ mod tests {
         controller
             .configure_root_quorum(RootQuorumPolicy::new(2, 3).unwrap())
             .unwrap();
-        let default_shares = split_secret(
-            b"synthetic default 5-of-3 root",
-            RecoveryPolicy::default(),
-        )
-        .expect("split generic 5-of-3 recovery set");
+        let default_shares =
+            split_secret(b"synthetic default 5-of-3 root", RecoveryPolicy::default())
+                .expect("split generic 5-of-3 recovery set");
         let token = controller
             .issue_bootstrap_token(Duration::from_secs(60))
             .unwrap();
