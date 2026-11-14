@@ -4,7 +4,7 @@ Phase 1.3 offline root recovery primitives.
 
 - Shamir sharing uses the upstream `vsss-rs` GF(256) implementation, pinned to 6.0.1 with only `std` and `zeroize` features enabled.
 - Default policy is 5 shares / 3 required; both are configurable. Policies below 2-of-n and more than 255 shares are rejected.
-- FRS1 carries a versioned header, ceremony identifier, public policy, original secret length, an integrity tag and one raw Shamir share.
+- FRS1 carries a versioned header, ceremony identifier, public policy, original secret length, an integrity tag and one raw Shamir share. The parsed share exposes only the non-secret ceremony identifier and participant/policy metadata; share bytes remain explicitly sensitive.
 - A fresh random HMAC-SHA-256 verification key is itself included in the Shamir secret. Recovery verifies the combined result before returning any root bytes. A corrupted share therefore fails closed rather than silently yielding wrong root material.
 - Share bytes are held in zeroizing allocations and never implement serialization frameworks, logging, persistence, or service storage. The explicit byte accessor is only for controlled offline custodian handoff.
 - The crate has no service, network, filesystem, database or logging dependency. Its caller must keep shares offline and transfer them to custodians out of band.

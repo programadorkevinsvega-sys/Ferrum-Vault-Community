@@ -28,6 +28,7 @@ jobs:
           - key_context_mutations
           - recovery_share_decode
           - recovery_share_mutations
+          - seal_bootstrap_transitions
     steps:
       - name: Check out repository
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1

@@ -1,0 +1,14 @@
+[package]
+name = "ferrum-seal"
+version = "0.1.0"
+description = "Seal lifecycle and one-time bootstrap state machine for Ferrum Community"
+edition.workspace = true
+license.workspace = true
+rust-version.workspace = true
+repository.workspace = true
+publish = false
+
+[dependencies]
+aws-lc-rs.workspace = true
+ferrum-recovery = { path = "../recovery" }
+zeroize.workspace = true

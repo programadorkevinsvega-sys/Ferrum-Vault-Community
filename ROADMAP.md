@@ -59,6 +59,8 @@ Implement the seal state machine, one-time bootstrap token and quorum-protected 
 
 **Definition of Done:** transition, replay, expiry, abuse and recovery tests pass; property/fuzz tests exercise invalid state transitions and malformed requests. The exact generate-root quorum remains pending and must be decided before implementing that parameter.
 
+**Implementation status — partial; CI and owner acceptance pending:** the new `ferrum-seal` crate implements a process-local Uninitialized/Sealed/Unsealed state machine, one-time expiring bootstrap token, FRS1 ceremony binding, Shamir-backed unseal and zeroizing in-memory root lifecycle. It adds transition, replay, expiry, malformed recovery, concurrency and deterministic property tests plus the `seal_bootstrap_transitions` fuzz target. The controller is volatile and is not a durable or multi-process service; Phase 1.7 must supply atomic persistence before service integration. It does not implement `generate-root`: ADR-0014's exact quorum remains pending and is not guessed. It also does not implement the Phase 1.5 AWS KMS adapter, API-level throttling/audit persistence or production deployment.
+
 ### 1.5 Auto-unseal
 
 Define the provider trait and implement AWS KMS as the first provider. Document outage, authentication, fallback and recovery behavior.
