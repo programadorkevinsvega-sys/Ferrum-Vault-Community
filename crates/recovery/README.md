@@ -12,3 +12,6 @@ Phase 1.3 offline root recovery primitives.
 The integrity tag authenticates the ceremony header and reconstructed root using a key protected by the same threshold scheme. It is not a digital signature, does not identify a custodian, and does not provide per-share public verifiability. Shamir's confidentiality threshold remains the primary share protection. Transport and physical custody are covered by the ceremony runbook.
 
 This implementation does not implement bootstrap, seal/unseal, generate-root quorum, backup/restore, AWS KMS, storage-barrier encryption or production ceremony UI. The exact generate-root quorum is a later pending owner decision and is not inferred here.
+
+
+Root material can also be generated directly with `generate_secret_shares(secret_len, policy)`, which obtains its entropy from the operating system and returns only the shares. The caller chooses the length; this crate does not impose an unapproved root-key size. See [the offline ceremony runbook](../../docs/security/recovery-ceremony.md).
