@@ -10,7 +10,10 @@ cargo-fuzz = true
 
 [dependencies]
 ferrum-crypto = { path = "../crates/crypto" }
+ferrum-recovery = { path = "../crates/recovery" }
 libfuzzer-sys = "=0.4.13"
+rand = { version = "=0.10.3", default-features = false, features = ["std_rng"] }
+rand_core = "=0.10.1"
 
 [[bin]]
 name = "seal_open_roundtrip"
@@ -43,6 +46,20 @@ bench = false
 [[bin]]
 name = "key_context_mutations"
 path = "fuzz_targets/key_context_mutations.rs"
+test = false
+doc = false
+bench = false
+
+[[bin]]
+name = "recovery_share_decode"
+path = "fuzz_targets/recovery_share_decode.rs"
+test = false
+doc = false
+bench = false
+
+[[bin]]
+name = "recovery_share_mutations"
+path = "fuzz_targets/recovery_share_mutations.rs"
 test = false
 doc = false
 bench = false
