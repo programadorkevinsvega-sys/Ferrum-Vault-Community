@@ -88,6 +88,7 @@ jobs:
           - recovery_share_mutations
           - seal_bootstrap_transitions
           - root_quorum_authorization
+          - shamir_unsealer
     steps:
       - name: Check out repository
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
@@ -135,6 +136,9 @@ jobs:
       - name: Test minimum supported Rust version
         run: cargo +1.98.0 test --locked --workspace --all-targets
 
+      - name: Test optional KMS feature on MSRV
+        run: cargo +1.98.0 test --locked -p ferrum-seal --features aws-kms
+
   miri-kmp:
     name: Miri (pure-Rust KMP parser)
     runs-on: ubuntu-24.04
@@ -151,9 +155,23 @@ jobs:
       - name: Run pure-Rust KMP parser tests under Miri
         run: cargo +nightly-2026-11-12 miri test --locked -p ferrum-crypto --lib kmp::tests
 
+  kms-adapter:
+    name: Optional KMS adapter (in-memory fake)
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          persist-credentials: false
+      - name: Install pinned Rust toolchain
+        run: rustup toolchain install 1.100.0 --profile minimal
+      - name: Test KMS adapter with in-memory fake only
+        run: cargo +1.100.0 test --locked -p ferrum-seal --features aws-kms
+
   quality:
     name: Public repository quality gates
-    needs: [rust, crypto-fuzz-smoke, msrv, miri-kmp]
+    needs: [rust, crypto-fuzz-smoke, msrv, miri-kmp, kms-adapter]
     runs-on: ubuntu-latest
     timeout-minutes: 10
     steps:

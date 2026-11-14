@@ -33,3 +33,8 @@ The owner has approved a fixed 2-of-3 quorum for `generate-root`, root rotation 
 - The quorum gate supplies an operation-specific context to a caller-owned callback; it does not retain or expose fragment bytes. Durable root mutation and audit transactions require the later service/storage integrations.
 
 The credential-revocation helper accepts no root fragments and has no root-quorum dependency. It requires a caller-provided audit sink to accept a request event before invoking the revocation callback and records the result using only a domain-separated credential-reference fingerprint, never the raw identifier. If the audit sink cannot accept the request event, the revocation callback is not run.
+
+
+## Phase 1.5 unsealing clarification
+
+The mandatory default Unsealer adapter for the seal lifecycle is Shamir 2-of-3. This does not change the generic offline recovery library's independent 5-of-3 default. The optional AWS KMS adapter is explicitly selected, disabled by default and never silently substituted when Shamir or KMS fails. KMS Decrypt permission allows unseal without presenting Shamir shares, so it is a high-impact trust privilege. It does not bypass the separately configured 2-of-3 quorum for `generate-root`, root rotation or root revocation. See ADR-0024.

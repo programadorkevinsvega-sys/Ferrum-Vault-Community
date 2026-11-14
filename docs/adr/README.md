@@ -36,7 +36,7 @@ The adaptations are written in English for public documentation. Decisions with 
 | [0011](0011-governance-and-pull-requests.md) | 0011 | Governance and pull requests | Owner-approved |
 | [0012](0012-product-name-and-trademark-clearance.md) | 0012 | Product name and trademark clearance | Working name approved; legal clearance pending |
 | [0013](0013-cryptography-and-key-management.md) | 0013 | Cryptography and key management | Owner-approved; rotation threshold pending |
-| [0014](0014-root-ceremony-recovery-and-backups.md) | 0014 | Root ceremony, recovery and backups | Owner-approved; generate-root quorum pending |
+| [0014](0014-root-ceremony-recovery-and-backups.md) | 0014 | Root ceremony, recovery and backups | Owner-approved; root-operation quorum explicitly 2-of-3 |
 | [0015](0015-reproducible-builds-and-api-versioning.md) | 0015 | Reproducible builds and API versioning | Owner-approved |
 | [0016](0016-supported-platforms-and-toolchain.md) | 0016 | Supported platforms and toolchain | Owner-approved |
 | [0017](0017-community-license.md) | 0017 | Community license | Owner-approved; legal review pending |
@@ -46,6 +46,7 @@ The adaptations are written in English for public documentation. Decisions with 
 | [0021](0021-user-interface.md) | 0021 | User interface | Owner-approved; implementation deferred |
 | [0022](0022-server-distribution.md) | 0022 | Server distribution | Owner-approved |
 | [0023](0023-cli-distribution.md) | 0023 | CLI distribution | Owner-approved |
+| [0024](0024-unsealer-port-and-optional-aws-kms.md) | 0024 | Unsealer port and optional AWS KMS adapter | Owner-approved |
 
 ## Change control
 

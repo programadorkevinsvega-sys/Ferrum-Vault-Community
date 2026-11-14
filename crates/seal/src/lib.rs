@@ -3,9 +3,8 @@
 //! Process-local seal lifecycle and one-time bootstrap state machine.
 //!
 //! The controller keeps the recovered root only while unsealed. It does not
-//! persist state, implement an HTTP API, or provide the Phase 1.5 auto-unseal
-//! adapter. A durable repository is required before this state machine can be
-//! used by a multi-process or production service.
+//! persist state or implement an HTTP API. Phase 1.5 provides a provider port
+//! and optional adapters; durable storage is required before service use.
 
 use std::fmt;
 use std::sync::{Mutex, MutexGuard};
@@ -679,7 +678,8 @@ mod tests {
     use std::time::{Duration, Instant};
 
     fn shares(root: &[u8]) -> Vec<RecoveryShare> {
-        split_secret(root, RecoveryPolicy::default()).expect("split test root")
+        split_secret(root, RecoveryPolicy::new(2, 3).expect("2-of-3 policy"))
+            .expect("split test root")
     }
 
     fn copy_shares(source: &[RecoveryShare]) -> Vec<RecoveryShare> {
@@ -1129,7 +1129,11 @@ mod tests {
         controller
             .configure_root_quorum(RootQuorumPolicy::new(2, 3).unwrap())
             .unwrap();
-        let default_shares = shares(b"synthetic default 5-of-3 root");
+        let default_shares = split_secret(
+            b"synthetic default 5-of-3 root",
+            RecoveryPolicy::default(),
+        )
+        .expect("split generic 5-of-3 recovery set");
         let token = controller
             .issue_bootstrap_token(Duration::from_secs(60))
             .unwrap();
