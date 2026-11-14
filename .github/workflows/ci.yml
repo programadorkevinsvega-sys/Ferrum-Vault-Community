@@ -184,15 +184,20 @@ jobs:
 
 
   prepare-aws-sdk-lockfiles:
-    name: Generate optional AWS SDK lockfile artifact
-    if: github.event_name == 'pull_request'
+    name: Generate and commit optional AWS SDK lockfiles
+    if: github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name == github.repository
+    permissions:
+      contents: write
+      actions: write
     runs-on: ubuntu-latest
     timeout-minutes: 15
     steps:
-      - name: Check out repository
+      - name: Check out PR head branch
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
-          persist-credentials: false
+          ref: ${{ github.head_ref }}
+          fetch-depth: 0
+          persist-credentials: true
       - name: Install pinned Cargo toolchain
         run: rustup toolchain install 1.100.0 --profile minimal
       - name: Resolve AWS SDK optional feature and export lockfiles
@@ -204,13 +209,31 @@ jobs:
           cp Cargo.lock /tmp/aws-sdk-lockfiles/Cargo.lock
           cargo +1.100.0 metadata --manifest-path fuzz/Cargo.toml --features ferrum-seal/aws-kms --format-version 1 >/dev/null
           cp fuzz/Cargo.lock /tmp/aws-sdk-lockfiles/fuzz-Cargo.lock
-      - name: Upload generated lockfiles for commit
+      - name: Upload generated lockfiles as a short-lived audit artifact
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         with:
           name: aws-sdk-generated-lockfiles
           path: /tmp/aws-sdk-lockfiles/
           if-no-files-found: error
           retention-days: 1
+      - name: Commit lockfile updates to this PR branch and dispatch exact-head checks
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+          PR_HEAD_BRANCH: ${{ github.head_ref }}
+        run: |
+          set -euo pipefail
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add Cargo.lock fuzz/Cargo.lock
+          if git diff --cached --quiet; then
+            echo "Both committed lockfiles already contain the optional AWS SDK resolution."
+            exit 0
+          fi
+          git commit -m "chore(deps): lock optional AWS SDK for Rust"
+          git push origin "HEAD:${PR_HEAD_BRANCH}"
+          gh workflow run ci.yml --ref "${PR_HEAD_BRANCH}"
+          gh workflow run secret-scan.yml --ref "${PR_HEAD_BRANCH}"
   quality:
     name: Public repository quality gates
     needs: [rust, crypto-fuzz-smoke, msrv, miri-kmp, kms-adapter]
