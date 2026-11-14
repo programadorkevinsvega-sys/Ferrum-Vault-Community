@@ -432,7 +432,7 @@ mod tests {
                         copy_share(&shares[third]),
                     ];
                     let recovered = recover_secret(&selected).unwrap();
-                    assert_eq!(&*recovered, secret);
+                    assert_eq!(recovered.as_slice(), secret.as_slice());
                     combinations += 1;
                 }
             }
@@ -452,7 +452,7 @@ mod tests {
                 let shares = deterministic_split(&secret, policy, length as u8);
                 let selected: Vec<_> = shares[..threshold].iter().map(copy_share).collect();
                 let recovered = recover_secret(&selected).unwrap();
-                assert_eq!(&*recovered, secret);
+                assert_eq!(recovered.as_slice(), secret.as_slice());
             }
         }
     }
@@ -582,7 +582,8 @@ mod tests {
             RecoveryShare::decode(selected[1].as_bytes()).unwrap(),
             RecoveryShare::decode(selected[2].as_bytes()).unwrap(),
         ];
-        assert_eq!(&*recover_secret(&copies).unwrap(), secret);
+        let recovered = recover_secret(&copies).unwrap();
+        assert_eq!(recovered.as_slice(), secret.as_slice());
     }
 
     #[test]
