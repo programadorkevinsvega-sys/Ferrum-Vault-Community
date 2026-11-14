@@ -56,11 +56,19 @@ impl RootQuorumPolicy {
         if threshold < 2 || share_count < threshold || share_count > 255 {
             return Err(SealError::InvalidQuorumPolicy);
         }
-        Ok(Self { threshold, share_count })
+        Ok(Self {
+            threshold,
+            share_count,
+        })
     }
 
-    pub const fn threshold(self) -> usize { self.threshold }
-    pub const fn share_count(self) -> usize { self.share_count }
+    pub const fn threshold(self) -> usize {
+        self.threshold
+    }
+
+    pub const fn share_count(self) -> usize {
+        self.share_count
+    }
 
     fn matches(self, recovery_policy: RecoveryPolicy) -> bool {
         self.threshold == recovery_policy.threshold()
@@ -241,7 +249,9 @@ impl SealController {
             return Ok(());
         }
         if inner.root_quorum.is_some()
-            || inner.recovery_policy.is_some_and(|recovery| !policy.matches(recovery))
+            || inner
+                .recovery_policy
+                .is_some_and(|recovery| !policy.matches(recovery))
         {
             return Err(SealError::InvalidQuorumPolicy);
         }
@@ -345,7 +355,10 @@ impl SealController {
             .ok_or(SealError::BootstrapRejected)?;
         {
             let inner = self.lock();
-            if inner.root_quorum.is_some_and(|policy| !policy.matches(recovery_policy)) {
+            if inner
+                .root_quorum
+                .is_some_and(|policy| !policy.matches(recovery_policy))
+            {
                 return Err(SealError::BootstrapRejected);
             }
         }
@@ -372,7 +385,10 @@ impl SealController {
             return Err(SealError::BootstrapRejected);
         }
 
-        if inner.root_quorum.is_some_and(|policy| !policy.matches(recovery_policy)) {
+        if inner
+            .root_quorum
+            .is_some_and(|policy| !policy.matches(recovery_policy))
+        {
             return Err(SealError::BootstrapRejected);
         }
         let next = next_generation(inner.generation)?;
@@ -482,13 +498,17 @@ impl SealController {
                 return Err(SealError::RootQuorumRejected);
             }
             let policy = inner.root_quorum.ok_or(SealError::QuorumNotConfigured)?;
-            let ceremony_id = inner.recovery_ceremony_id.ok_or(SealError::RootQuorumRejected)?;
+            let ceremony_id = inner
+                .recovery_ceremony_id
+                .ok_or(SealError::RootQuorumRejected)?;
             (policy, ceremony_id, inner.generation)
         };
 
         if shares.len() < policy.threshold()
             || shares.len() > policy.share_count()
-            || shares.first().is_none_or(|share| !policy.matches(share.policy()))
+            || shares
+                .first()
+                .is_none_or(|share| !policy.matches(share.policy()))
         {
             return Err(SealError::RootQuorumRejected);
         }
@@ -1009,13 +1029,27 @@ mod tests {
             .expect("bootstrap without privileged-operation quorum config");
 
         assert_eq!(
-            controller.with_root_quorum(RootQuorumOperation::GenerateRoot, &root_shares[..2], |_| ()),
+            controller.with_root_quorum(
+                RootQuorumOperation::GenerateRoot,
+                &root_shares[..2],
+                |_| ()
+            ),
             Err(SealError::QuorumNotConfigured)
         );
-        assert_eq!(RootQuorumPolicy::new(1, 3), Err(SealError::InvalidQuorumPolicy));
-        assert_eq!(RootQuorumPolicy::new(4, 3), Err(SealError::InvalidQuorumPolicy));
         assert_eq!(
-            controller.with_root_quorum(RootQuorumOperation::RotateRoot, &root_shares[..2], |_| ()),
+            RootQuorumPolicy::new(1, 3),
+            Err(SealError::InvalidQuorumPolicy)
+        );
+        assert_eq!(
+            RootQuorumPolicy::new(4, 3),
+            Err(SealError::InvalidQuorumPolicy)
+        );
+        assert_eq!(
+            controller.with_root_quorum(
+                RootQuorumOperation::RotateRoot,
+                &root_shares[..2],
+                |_| ()
+            ),
             Err(SealError::QuorumNotConfigured)
         );
     }
@@ -1055,11 +1089,7 @@ mod tests {
             RecoveryShare::decode(root_shares[0].as_bytes()).unwrap(),
         ];
         assert_eq!(
-            controller.with_root_quorum(
-                RootQuorumOperation::RotateRoot,
-                &duplicate,
-                |_| ()
-            ),
+            controller.with_root_quorum(RootQuorumOperation::RotateRoot, &duplicate, |_| ()),
             Err(SealError::RootQuorumRejected)
         );
     }
@@ -1077,11 +1107,7 @@ mod tests {
             RecoveryShare::decode(root_shares[1].as_bytes()).unwrap(),
         ];
         assert_eq!(
-            controller.with_root_quorum(
-                RootQuorumOperation::GenerateRoot,
-                &supplied,
-                |_| ()
-            ),
+            controller.with_root_quorum(RootQuorumOperation::GenerateRoot, &supplied, |_| ()),
             Err(SealError::RootQuorumRejected)
         );
     }
@@ -1096,11 +1122,7 @@ mod tests {
             RecoveryShare::decode(second[1].as_bytes()).unwrap(),
         ];
         assert_eq!(
-            controller.with_root_quorum(
-                RootQuorumOperation::RevokeRoot,
-                &supplied,
-                |_| ()
-            ),
+            controller.with_root_quorum(RootQuorumOperation::RevokeRoot, &supplied, |_| ()),
             Err(SealError::RootQuorumRejected)
         );
     }
@@ -1108,9 +1130,13 @@ mod tests {
     #[test]
     fn the_three_of_five_recovery_default_is_not_accepted_as_the_explicit_2_of_3_root_quorum() {
         let controller = SealController::new();
-        controller.configure_root_quorum(RootQuorumPolicy::new(2, 3).unwrap()).unwrap();
+        controller
+            .configure_root_quorum(RootQuorumPolicy::new(2, 3).unwrap())
+            .unwrap();
         let default_shares = shares(b"synthetic default 5-of-3 root");
-        let token = controller.issue_bootstrap_token(Duration::from_secs(60)).unwrap();
+        let token = controller
+            .issue_bootstrap_token(Duration::from_secs(60))
+            .unwrap();
         assert_eq!(
             controller.bootstrap(&token, &default_shares[..3]),
             Err(SealError::BootstrapRejected)
@@ -1153,7 +1179,10 @@ mod tests {
 
     #[test]
     fn derived_credential_revocation_fails_closed_when_audit_sink_is_unavailable() {
-        let sink = TestAuditSink { events: Mutex::new(Vec::new()), fail: true };
+        let sink = TestAuditSink {
+            events: Mutex::new(Vec::new()),
+            fail: true,
+        };
         let mut revoked = false;
         let result = revoke_derived_credential(b"credential-reference-456", &sink, || {
             revoked = true;
@@ -1165,5 +1194,4 @@ mod tests {
         );
         assert!(!revoked);
     }
-
 }
