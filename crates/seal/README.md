@@ -17,7 +17,7 @@ This crate is a process-local state machine, not a durable seal service. Bootstr
 
 The crate does not implement an HTTP/API layer, audit persistence, throttling/rate limiting, KMP key hierarchy orchestration, the Phase 1.5 AWS KMS auto-unseal adapter, barrier encryption or backup/restore. It does not export the recovered root except through the scoped callback, but callers can still copy bytes inside that callback; zeroization is best-effort and is not an absolute memory-protection guarantee.
 
-The generate-root workflow is deliberately not implemented. ADR-0014 leaves its exact quorum pending an owner decision. No default, threshold or bypass is supplied by this crate.
+The service-level generate-root handler/token-issuance flow is not implemented by this crate. The crate supplies the approved 2-of-3 authorization gate for generate-root, root rotation and root revocation. There is no automatically installed quorum policy; the caller must explicitly configure it. Durable root mutation and a production command/API remain outside this phase.
 
 See [the seal lifecycle security notes](../../docs/security/seal-lifecycle.md).
 
