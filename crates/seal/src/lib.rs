@@ -96,7 +96,6 @@ pub enum SealError {
     InvalidBootstrapTokenLength,
     InvalidBootstrapLifetime,
     BootstrapExpiryOutOfRange,
-    RecoveryRejected,
     UnsealRejected,
     ConcurrentTransition,
     RandomnessUnavailable,
@@ -112,7 +111,6 @@ impl fmt::Display for SealError {
             Self::InvalidBootstrapTokenLength => "invalid bootstrap credential length",
             Self::InvalidBootstrapLifetime => "bootstrap credential lifetime must be positive",
             Self::BootstrapExpiryOutOfRange => "bootstrap credential expiry is out of range",
-            Self::RecoveryRejected => "recovery material rejected",
             Self::UnsealRejected => "unseal request rejected",
             Self::ConcurrentTransition => "seal lifecycle changed during the operation",
             Self::RandomnessUnavailable => "secure randomness is unavailable",
@@ -265,8 +263,9 @@ impl SealController {
             (pending.verifier, inner.generation)
         };
 
-        let ceremony_id = matching_ceremony_id(shares)?;
-        let recovered = recover_secret(shares).map_err(|_| SealError::RecoveryRejected)?;
+        let ceremony_id =
+            matching_ceremony_id(shares).ok_or(SealError::BootstrapRejected)?;
+        let recovered = recover_secret(shares).map_err(|_| SealError::BootstrapRejected)?;
         drop(recovered);
 
         let mut inner = self.lock();
@@ -316,7 +315,8 @@ impl SealController {
             )
         };
 
-        let supplied_ceremony_id = matching_ceremony_id(shares)?;
+        let supplied_ceremony_id =
+            matching_ceremony_id(shares).ok_or(SealError::UnsealRejected)?;
         if !constant_time_equal(&expected_ceremony_id, &supplied_ceremony_id) {
             return Err(SealError::UnsealRejected);
         }
@@ -379,16 +379,16 @@ impl SealController {
     }
 }
 
-fn matching_ceremony_id(shares: &[RecoveryShare]) -> Result<[u8; 16], SealError> {
-    let first = shares.first().ok_or(SealError::RecoveryRejected)?;
+fn matching_ceremony_id(shares: &[RecoveryShare]) -> Option<[u8; 16]> {
+    let first = shares.first()?;
     let ceremony_id = first.ceremony_id();
     if shares
         .iter()
         .any(|share| !constant_time_equal(&ceremony_id, &share.ceremony_id()))
     {
-        return Err(SealError::RecoveryRejected);
+        return None;
     }
-    Ok(ceremony_id)
+    Some(ceremony_id)
 }
 
 fn token_verifier(token: &[u8; BOOTSTRAP_TOKEN_LEN]) -> [u8; digest::SHA256_OUTPUT_LEN] {
@@ -542,7 +542,7 @@ mod tests {
 
         assert_eq!(
             controller.bootstrap(&token, &other_shares[..2]),
-            Err(SealError::RecoveryRejected)
+            Err(SealError::BootstrapRejected)
         );
         assert_eq!(controller.snapshot().status, SealStatus::Uninitialized);
         assert!(controller.snapshot().bootstrap_pending);
