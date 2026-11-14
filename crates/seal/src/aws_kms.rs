@@ -303,7 +303,8 @@ impl AwsSdkKmsApi {
             .key_id(&self.key_arn)
             .send()
             .await
-            .map_err(map_sdk_error)?;
+            .map_err(map_sdk_error)
+            .map_err(map_kms_error)?;
         let metadata = output
             .key_metadata()
             .ok_or(UnsealerError::InvalidConfiguration)?;
