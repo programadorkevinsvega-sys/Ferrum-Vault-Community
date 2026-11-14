@@ -584,19 +584,13 @@ mod tests {
 
     #[test]
     fn ceremony_identifier_is_consistent_and_public_metadata_only() {
-        let first = deterministic_split(
-            &synthetic_secret(24, 0x71),
-            RecoveryPolicy::default(),
-            0x71,
-        );
+        let first =
+            deterministic_split(&synthetic_secret(24, 0x71), RecoveryPolicy::default(), 0x71);
         let identifier = first[0].ceremony_id();
         assert!(first.iter().all(|share| share.ceremony_id() == identifier));
 
-        let second = deterministic_split(
-            &synthetic_secret(24, 0x72),
-            RecoveryPolicy::default(),
-            0x72,
-        );
+        let second =
+            deterministic_split(&synthetic_secret(24, 0x72), RecoveryPolicy::default(), 0x72);
         assert_ne!(identifier, second[0].ceremony_id());
     }
 

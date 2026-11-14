@@ -183,10 +183,7 @@ impl SealController {
     /// There is deliberately no default TTL. Expiry uses Instant, not wall
     /// clock time. An expired, unused credential may be replaced while the
     /// controller remains uninitialized; a consumed credential may not.
-    pub fn issue_bootstrap_token(
-        &self,
-        lifetime: Duration,
-    ) -> Result<BootstrapToken, SealError> {
+    pub fn issue_bootstrap_token(&self, lifetime: Duration) -> Result<BootstrapToken, SealError> {
         self.issue_bootstrap_token_at(lifetime, Instant::now())
     }
 
@@ -361,10 +358,7 @@ impl SealController {
 
     /// Provides scoped access to the active root without returning or cloning
     /// its buffer. Callers must not retain or copy the supplied bytes.
-    pub fn with_root_key<T>(
-        &self,
-        operation: impl FnOnce(&[u8]) -> T,
-    ) -> Result<T, SealError> {
+    pub fn with_root_key<T>(&self, operation: impl FnOnce(&[u8]) -> T) -> Result<T, SealError> {
         let inner = self.lock();
         if inner.status != SealStatus::Unsealed {
             return Err(SealError::InvalidStateTransition);
@@ -484,9 +478,11 @@ mod tests {
         assert_eq!(controller.snapshot().status, SealStatus::Uninitialized);
         assert!(!controller.snapshot().bootstrap_pending);
 
-        assert!(controller
-            .issue_bootstrap_token_at(Duration::from_secs(5), expired_at)
-            .is_ok());
+        assert!(
+            controller
+                .issue_bootstrap_token_at(Duration::from_secs(5), expired_at)
+                .is_ok()
+        );
     }
 
     #[test]
@@ -528,7 +524,9 @@ mod tests {
             Err(SealError::BootstrapRejected)
         );
         assert_eq!(
-            controller.issue_bootstrap_token(Duration::from_secs(60)).err(),
+            controller
+                .issue_bootstrap_token(Duration::from_secs(60))
+                .err(),
             Some(SealError::InvalidStateTransition)
         );
     }
@@ -605,10 +603,7 @@ mod tests {
             controller.with_root_key(|_| ()),
             Err(SealError::InvalidStateTransition)
         );
-        assert_eq!(
-            controller.seal(),
-            Err(SealError::InvalidStateTransition)
-        );
+        assert_eq!(controller.seal(), Err(SealError::InvalidStateTransition));
     }
 
     #[test]
@@ -634,12 +629,22 @@ mod tests {
         let second_shares = copy_shares(&root_shares[..3]);
         let second = thread::spawn(move || {
             second_barrier.wait();
-            second_controller.bootstrap(&token_copy, &second_shares).is_ok()
+            second_controller
+                .bootstrap(&token_copy, &second_shares)
+                .is_ok()
         });
 
         barrier.wait();
-        let first_won = if first.join().expect("first thread") { 1 } else { 0 };
-        let second_won = if second.join().expect("second thread") { 1 } else { 0 };
+        let first_won = if first.join().expect("first thread") {
+            1
+        } else {
+            0
+        };
+        let second_won = if second.join().expect("second thread") {
+            1
+        } else {
+            0
+        };
         let winners = first_won + second_won;
         assert_eq!(winners, 1);
         assert_eq!(controller.snapshot().status, SealStatus::Sealed);
