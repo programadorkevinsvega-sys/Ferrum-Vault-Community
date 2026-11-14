@@ -142,7 +142,7 @@ impl fmt::Display for RecoveryError {
             Self::DuplicateParticipant => "duplicate recovery participant",
             Self::MismatchedCeremony => {
                 "recovery shares belong to different ceremonies or policies"
-            },
+            }
             Self::AuthenticationFailed => "recovery-share integrity verification failed",
             Self::ReconstructionFailed => "recovery shares could not be reconstructed",
         })
