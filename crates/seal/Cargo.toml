@@ -20,3 +20,8 @@ tokio = { version = "=1.54.1", optional = true, features = ["macros", "rt-multi-
 aws-lc-rs.workspace = true
 ferrum-recovery = { path = "../recovery" }
 zeroize.workspace = true
+
+[[example]]
+name = "aws_kms_live_verify"
+path = "examples/aws_kms_live_verify.rs"
+required-features = ["aws-kms"]
