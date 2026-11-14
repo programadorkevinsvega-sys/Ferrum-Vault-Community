@@ -62,7 +62,7 @@ impl BootstrapToken {
 
     /// Exposes the credential bytes for an explicit secure handoff.
     pub fn as_bytes(&self) -> &[u8; BOOTSTRAP_TOKEN_LEN] {
-        &*self.bytes
+        &self.bytes
     }
 
     fn generate() -> Result<Self, SealError> {
