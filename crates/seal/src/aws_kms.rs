@@ -9,11 +9,11 @@
 use std::fmt;
 
 use async_trait::async_trait;
+use aws_lc_rs::digest::{self, SHA256};
 #[cfg(feature = "aws-kms")]
 use aws_sdk_kms::primitives::Blob;
 #[cfg(feature = "aws-kms")]
 use aws_sdk_kms::types::{KeyManagerType, KeySpec, KeyState, KeyUsageType};
-use aws_lc_rs::digest::{self, SHA256};
 use zeroize::Zeroizing;
 
 use crate::unsealer::{UnsealRequest, UnsealSource, Unsealer, UnsealerError, WrappedRootEnvelope};
@@ -246,7 +246,6 @@ fn append_context_field(output: &mut Vec<u8>, value: &[u8]) {
     output.extend_from_slice(value);
 }
 
-
 /// Official AWS SDK for Rust implementation of the KMS bridge.
 ///
 /// The SDK's default credential provider chain is used. Region is taken from
@@ -353,10 +352,7 @@ impl AwsKmsApi for AwsSdkKmsApi {
             .ok_or(KmsApiError::Failure)?
             .as_ref()
             .to_vec();
-        let returned_key_id = output
-            .key_id()
-            .unwrap_or(self.key_arn.as_str())
-            .to_owned();
+        let returned_key_id = output.key_id().unwrap_or(self.key_arn.as_str()).to_owned();
 
         Ok(KmsCiphertext {
             key_id: returned_key_id,
@@ -385,10 +381,7 @@ impl AwsKmsApi for AwsSdkKmsApi {
             .map_err(map_sdk_error)?;
 
         let plaintext = output.plaintext().ok_or(KmsApiError::Failure)?;
-        let returned_key_id = output
-            .key_id()
-            .unwrap_or(self.key_arn.as_str())
-            .to_owned();
+        let returned_key_id = output.key_id().unwrap_or(self.key_arn.as_str()).to_owned();
 
         Ok(KmsPlaintext::new(
             returned_key_id,
@@ -448,7 +441,6 @@ impl AwsKmsUnsealer<AwsSdkKmsApi> {
         self.client.key_arn()
     }
 }
-
 
 #[cfg(test)]
 mod tests {
@@ -752,7 +744,6 @@ mod tests {
         );
     }
 
-
     #[test]
     fn kms_encrypt_rejects_plaintext_larger_than_symmetric_kms_limit() {
         let root = vec![0x5A; 4097];
@@ -768,15 +759,20 @@ mod tests {
     fn key_arn_parser_requires_a_regional_customer_key_arn() {
         assert_eq!(super::kms_region_from_key_arn(KEY_ID), Some("us-east-1"));
         assert!(super::kms_region_from_key_arn("alias/ferrum-root").is_none());
-        assert!(super::kms_region_from_key_arn("12345678-1234-1234-1234-123456789012").is_none());
         assert!(super::kms_region_from_key_arn(
-            "arn:aws:kms:us-east-1:12345678901:key/12345678-1234-1234-1234-123456789012"
+            "12345678-1234-1234-1234-123456789012"
         )
         .is_none());
-        assert!(super::kms_region_from_key_arn(
-            "arn:aws:kms:us-east-1:123456789012:alias/ferrum-root"
-        )
-        .is_none());
+        assert!(
+            super::kms_region_from_key_arn(
+                "arn:aws:kms:us-east-1:12345678901:key/12345678-1234-1234-1234-123456789012"
+            )
+            .is_none()
+        );
+        assert!(
+            super::kms_region_from_key_arn("arn:aws:kms:us-east-1:123456789012:alias/ferrum-root")
+                .is_none()
+        );
     }
 
     #[test]

@@ -7,9 +7,7 @@
 use std::env;
 
 use aws_lc_rs::rand::{SecureRandom, SystemRandom};
-use ferrum_seal::aws_kms::{
-    AwsKmsUnsealer, AwsSdkKmsApi, kms_context_sha256_hex,
-};
+use ferrum_seal::aws_kms::{AwsKmsUnsealer, AwsSdkKmsApi, kms_context_sha256_hex};
 use ferrum_seal::unsealer::{UnsealRequest, Unsealer};
 use zeroize::Zeroizing;
 
@@ -26,8 +24,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         return Err("FERRUM_AWS_KMS_ENVELOPE_VERSION must be positive".into());
     }
 
-    let adapter =
-        AwsKmsUnsealer::<AwsSdkKmsApi>::from_environment(key_arn, key_version).await?;
+    let adapter = AwsKmsUnsealer::<AwsSdkKmsApi>::from_environment(key_arn, key_version).await?;
     let mut synthetic_root = Zeroizing::new(vec![0_u8; 32]);
     SystemRandom::new().fill(&mut synthetic_root)?;
     let mut ceremony_id = [0_u8; 16];
