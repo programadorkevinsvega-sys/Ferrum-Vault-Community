@@ -1,0 +1,36 @@
+{
+  "Version": "2012-10-17",
+  "Statement": [
+    {
+      "Sid": "AllowFerrumDescribeRootKey",
+      "Effect": "Allow",
+      "Principal": {
+        "AWS": "arn:aws:iam::123456789012:role/FerrumVaultRuntime"
+      },
+      "Action": "kms:DescribeKey",
+      "Resource": "*"
+    },
+    {
+      "Sid": "AllowFerrumRootCryptographicOperationsWithContext",
+      "Effect": "Allow",
+      "Principal": {
+        "AWS": "arn:aws:iam::123456789012:role/FerrumVaultRuntime"
+      },
+      "Action": [
+        "kms:Encrypt",
+        "kms:Decrypt"
+      ],
+      "Resource": "*",
+      "Condition": {
+        "Null": {
+          "kms:EncryptionContext:FerrumContextSHA256V1": "false"
+        },
+        "ForAllValues:StringEquals": {
+          "kms:EncryptionContextKeys": [
+            "FerrumContextSHA256V1"
+          ]
+        }
+      }
+    }
+  ]
+}

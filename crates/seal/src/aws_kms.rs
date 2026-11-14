@@ -1,13 +1,18 @@
 //! Explicit, feature-gated AWS KMS auto-unseal adapter.
 //!
-//! This module intentionally has no AWS SDK or credential-provider dependency.
-//! The host application injects a narrow client implementation, allowing its
-//! chosen AWS SDK version, region and credential chain to remain outside the
-//! Ferrum core. Unit tests use an in-memory fake and no AWS credentials.
+//! The optional aws-kms feature contains the official AWS SDK for Rust adapter.
+//! Credentials are resolved by the SDK's default provider chain (environment,
+//! shared config/profile, web identity and workload/instance roles). No credential
+//! values are hardcoded by Ferrum; the SDK resolves them externally. Unit tests use an in-memory
+//! fake and no AWS account or credentials.
 
 use std::fmt;
 
 use async_trait::async_trait;
+#[cfg(feature = "aws-kms")]
+use aws_sdk_kms::primitives::Blob;
+#[cfg(feature = "aws-kms")]
+use aws_sdk_kms::types::{KeyManagerType, KeySpec, KeyState, KeyUsageType};
 use aws_lc_rs::digest::{self, SHA256};
 use zeroize::Zeroizing;
 
@@ -26,6 +31,7 @@ pub enum KmsApiError {
     Timeout,
     Transport,
     Failure,
+    InvalidKeyConfiguration,
 }
 
 impl fmt::Display for KmsApiError {
@@ -68,9 +74,11 @@ impl fmt::Debug for KmsPlaintext {
     }
 }
 
-/// Thin asynchronous bridge implemented by the host application's AWS SDK
-/// client. Implementations must use a symmetric KMS key and pass exactly one
-/// encryption-context pair: FerrumContextSHA256V1 = context_sha256_hex.
+/// Thin asynchronous bridge used by the provider-neutral unsealer.
+/// The production implementation is the feature-gated official AWS SDK
+/// adapter below; tests inject an in-memory fake. Implementations must use a
+/// symmetric KMS key and pass exactly one encryption-context pair:
+/// FerrumContextSHA256V1 = context_sha256_hex.
 #[async_trait]
 pub trait AwsKmsApi: Send + Sync {
     async fn encrypt(
@@ -89,7 +97,7 @@ pub trait AwsKmsApi: Send + Sync {
 }
 
 /// Opt-in adapter. The configured KMS key ARN and envelope version are
-/// mandatory; there is no default, implicit credential chain or local fallback.
+/// mandatory; there is no default provider, and no local fallback.
 pub struct AwsKmsUnsealer<C> {
     client: C,
     key_id: String,
@@ -103,7 +111,7 @@ impl<C: AwsKmsApi> AwsKmsUnsealer<C> {
         key_version: u64,
     ) -> Result<Self, UnsealerError> {
         let key_id = key_id.into();
-        if !valid_kms_key_id(&key_id) || key_version == 0 {
+        if kms_region_from_key_arn(&key_id).is_none() || key_version == 0 {
             return Err(UnsealerError::InvalidConfiguration);
         }
         Ok(Self {
@@ -125,10 +133,10 @@ impl<C: AwsKmsApi> AwsKmsUnsealer<C> {
         root: &[u8],
         ceremony_id: [u8; 16],
     ) -> Result<WrappedRootEnvelope, UnsealerError> {
-        if root.is_empty() {
+        if root.is_empty() || root.len() > 4096 {
             return Err(UnsealerError::InvalidWrappedRoot);
         }
-        let context = encryption_context(ceremony_id);
+        let context = kms_context_sha256_hex(ceremony_id);
         let encrypted = self
             .client
             .encrypt(&self.key_id, root, &context)
@@ -155,7 +163,7 @@ impl<C: AwsKmsApi> Unsealer for AwsKmsUnsealer<C> {
             return Err(UnsealerError::AuthenticationFailed);
         }
 
-        let context = encryption_context(request.expected_ceremony_id());
+        let context = kms_context_sha256_hex(request.expected_ceremony_id());
         let decrypted = self
             .client
             .decrypt(&self.key_id, wrapped.ciphertext(), &context)
@@ -177,23 +185,45 @@ fn map_kms_error(error: KmsApiError) -> UnsealerError {
         }
         KmsApiError::Timeout => UnsealerError::ProviderTimeout,
         KmsApiError::Failure => UnsealerError::ProviderFailure,
+        KmsApiError::InvalidKeyConfiguration => UnsealerError::InvalidConfiguration,
     }
 }
 
-fn valid_kms_key_id(value: &str) -> bool {
-    let bytes = value.as_bytes();
-    !bytes.is_empty()
-        && bytes.len() <= 2048
-        && bytes[0].is_ascii_alphanumeric()
-        && bytes
-            .iter()
-            .all(|byte| byte.is_ascii_alphanumeric() || b"._:/+-".contains(byte))
+fn kms_region_from_key_arn(value: &str) -> Option<&str> {
+    let mut parts = value.split(':');
+    if parts.next()? != "arn" {
+        return None;
+    }
+    if !matches!(parts.next()?, "aws" | "aws-us-gov" | "aws-cn") {
+        return None;
+    }
+    if parts.next()? != "kms" {
+        return None;
+    }
+    let region = parts.next()?;
+    if region.is_empty()
+        || !region
+            .bytes()
+            .all(|byte| byte.is_ascii_lowercase() || byte.is_ascii_digit() || byte == b'-')
+    {
+        return None;
+    }
+    let account = parts.next()?;
+    if account.len() != 12 || !account.bytes().all(|byte| byte.is_ascii_digit()) {
+        return None;
+    }
+    let resource = parts.next()?;
+    let key_id = resource.strip_prefix("key/")?;
+    if key_id.is_empty() || key_id.contains('/') || parts.next().is_some() {
+        return None;
+    }
+    Some(region)
 }
 
 /// FVC1-compatible context containing tenant=root, purpose=seal-root and the
 /// public ceremony identifier. Only its SHA-256 digest is sent to KMS because
 /// KMS encryption context is plaintext audit metadata.
-fn encryption_context(ceremony_id: [u8; 16]) -> String {
+pub fn kms_context_sha256_hex(ceremony_id: [u8; 16]) -> String {
     let mut encoded = Vec::with_capacity(64);
     encoded.extend_from_slice(b"FVC1");
     encoded.extend_from_slice(&1_u16.to_be_bytes());
@@ -215,6 +245,209 @@ fn append_context_field(output: &mut Vec<u8>, value: &[u8]) {
     output.extend_from_slice(&length.to_be_bytes());
     output.extend_from_slice(value);
 }
+
+
+/// Official AWS SDK for Rust implementation of the KMS bridge.
+///
+/// The SDK's default credential provider chain is used. Region is taken from
+/// the configured KMS key ARN, rather than silently falling back to a
+/// different region. The constructor calls DescribeKey and rejects keys that
+/// are not enabled symmetric ENCRYPT_DECRYPT keys.
+#[cfg(feature = "aws-kms")]
+#[derive(Clone)]
+pub struct AwsSdkKmsApi {
+    client: aws_sdk_kms::Client,
+    key_arn: String,
+    region: String,
+}
+
+#[cfg(feature = "aws-kms")]
+impl AwsSdkKmsApi {
+    /// Loads credentials and region through the official SDK configuration
+    /// chain, pins the service client to the ARN's region, and validates the
+    /// key with DescribeKey before returning.
+    pub async fn from_default_chain_for_key_arn(
+        key_arn: impl Into<String>,
+    ) -> Result<Self, UnsealerError> {
+        let key_arn = key_arn.into();
+        let region = kms_region_from_key_arn(&key_arn)
+            .ok_or(UnsealerError::InvalidConfiguration)?
+            .to_owned();
+
+        let sdk_config = aws_config::defaults(aws_config::BehaviorVersion::latest())
+            .region(aws_sdk_kms::config::Region::new(region.clone()))
+            .load()
+            .await;
+        let client = aws_sdk_kms::Client::new(&sdk_config);
+        let api = Self {
+            client,
+            key_arn,
+            region,
+        };
+        api.validate_key().await?;
+        Ok(api)
+    }
+
+    pub fn region(&self) -> &str {
+        &self.region
+    }
+
+    pub fn key_arn(&self) -> &str {
+        &self.key_arn
+    }
+
+    async fn validate_key(&self) -> Result<(), UnsealerError> {
+        let output = self
+            .client
+            .describe_key()
+            .key_id(&self.key_arn)
+            .send()
+            .await
+            .map_err(map_sdk_error)?;
+        let metadata = output
+            .key_metadata()
+            .ok_or(UnsealerError::InvalidConfiguration)?;
+
+        if metadata.arn() != Some(self.key_arn.as_str())
+            || metadata.key_manager() != Some(&KeyManagerType::Customer)
+            || metadata.key_usage() != Some(&KeyUsageType::EncryptDecrypt)
+            || metadata.key_spec() != Some(&KeySpec::SymmetricDefault)
+        {
+            return Err(UnsealerError::InvalidConfiguration);
+        }
+
+        if !metadata.enabled() || metadata.key_state() != Some(&KeyState::Enabled) {
+            return Err(UnsealerError::ProviderUnavailable);
+        }
+
+        Ok(())
+    }
+}
+
+#[cfg(feature = "aws-kms")]
+#[async_trait]
+impl AwsKmsApi for AwsSdkKmsApi {
+    async fn encrypt(
+        &self,
+        key_id: &str,
+        plaintext: &[u8],
+        context_sha256_hex: &str,
+    ) -> Result<KmsCiphertext, KmsApiError> {
+        if key_id != self.key_arn || plaintext.is_empty() || plaintext.len() > 4096 {
+            return Err(KmsApiError::InvalidKeyConfiguration);
+        }
+
+        let output = self
+            .client
+            .encrypt()
+            .key_id(&self.key_arn)
+            .plaintext(Blob::new(plaintext))
+            .encryption_context(AWS_KMS_CONTEXT_KEY, context_sha256_hex)
+            .send()
+            .await
+            .map_err(map_sdk_error)?;
+
+        let ciphertext = output
+            .ciphertext_blob()
+            .ok_or(KmsApiError::Failure)?
+            .as_ref()
+            .to_vec();
+        let returned_key_id = output
+            .key_id()
+            .unwrap_or(self.key_arn.as_str())
+            .to_owned();
+
+        Ok(KmsCiphertext {
+            key_id: returned_key_id,
+            ciphertext,
+        })
+    }
+
+    async fn decrypt(
+        &self,
+        key_id: &str,
+        ciphertext: &[u8],
+        context_sha256_hex: &str,
+    ) -> Result<KmsPlaintext, KmsApiError> {
+        if key_id != self.key_arn || ciphertext.is_empty() {
+            return Err(KmsApiError::InvalidKeyConfiguration);
+        }
+
+        let output = self
+            .client
+            .decrypt()
+            .key_id(&self.key_arn)
+            .ciphertext_blob(Blob::new(ciphertext))
+            .encryption_context(AWS_KMS_CONTEXT_KEY, context_sha256_hex)
+            .send()
+            .await
+            .map_err(map_sdk_error)?;
+
+        let plaintext = output.plaintext().ok_or(KmsApiError::Failure)?;
+        let returned_key_id = output
+            .key_id()
+            .unwrap_or(self.key_arn.as_str())
+            .to_owned();
+
+        Ok(KmsPlaintext::new(
+            returned_key_id,
+            Zeroizing::new(plaintext.as_ref().to_vec()),
+        ))
+    }
+}
+
+#[cfg(feature = "aws-kms")]
+fn map_sdk_error<E, R>(error: aws_sdk_kms::error::SdkError<E, R>) -> KmsApiError
+where
+    E: aws_sdk_kms::error::ProvideErrorMetadata,
+{
+    if let Some(code) = error.as_service_error().and_then(|service| service.code()) {
+        return match code {
+            "AccessDeniedException" => KmsApiError::AccessDenied,
+            "InvalidCiphertextException" | "IncorrectKeyException" => {
+                KmsApiError::InvalidCiphertext
+            }
+            "DisabledException" | "KMSInvalidStateException" | "NotFoundException" => {
+                KmsApiError::KeyUnavailable
+            }
+            "ThrottlingException" | "LimitExceededException" => KmsApiError::Throttled,
+            "DependencyTimeoutException" => KmsApiError::Timeout,
+            _ => KmsApiError::Failure,
+        };
+    }
+
+    match error {
+        aws_sdk_kms::error::SdkError::TimeoutError(_) => KmsApiError::Timeout,
+        aws_sdk_kms::error::SdkError::DispatchFailure(_)
+        | aws_sdk_kms::error::SdkError::ResponseError(_) => KmsApiError::Transport,
+        aws_sdk_kms::error::SdkError::ConstructionFailure(_) => KmsApiError::Failure,
+        aws_sdk_kms::error::SdkError::ServiceError(_) => KmsApiError::Failure,
+        _ => KmsApiError::Failure,
+    }
+}
+
+/// Creates an AWS-backed unsealer using the SDK's standard credential chain.
+/// Region is pinned from the key ARN, and DescribeKey is checked up front.
+#[cfg(feature = "aws-kms")]
+impl AwsKmsUnsealer<AwsSdkKmsApi> {
+    pub async fn from_environment(
+        key_arn: impl Into<String>,
+        key_version: u64,
+    ) -> Result<Self, UnsealerError> {
+        let key_arn = key_arn.into();
+        let client = AwsSdkKmsApi::from_default_chain_for_key_arn(&key_arn).await?;
+        Self::new(client, key_arn, key_version)
+    }
+
+    pub fn region(&self) -> &str {
+        self.client.region()
+    }
+
+    pub fn configured_key_arn(&self) -> &str {
+        self.client.key_arn()
+    }
+}
+
 
 #[cfg(test)]
 mod tests {
@@ -512,11 +745,58 @@ mod tests {
             super::map_kms_error(KmsApiError::Failure),
             UnsealerError::ProviderFailure
         );
+        assert_eq!(
+            super::map_kms_error(KmsApiError::InvalidKeyConfiguration),
+            UnsealerError::InvalidConfiguration
+        );
+    }
+
+
+    #[test]
+    fn kms_encrypt_rejects_plaintext_larger_than_symmetric_kms_limit() {
+        let root = vec![0x5A; 4097];
+        let shares = make_shares(&root);
+        let adapter = AwsKmsUnsealer::new(FakeKms::default(), KEY_ID, 1).unwrap();
+        assert_eq!(
+            block_on(adapter.encrypt_root_for_unseal(&root, shares[0].ceremony_id())).err(),
+            Some(UnsealerError::InvalidWrappedRoot)
+        );
+    }
+
+    #[test]
+    fn key_arn_parser_requires_a_regional_customer_key_arn() {
+        assert_eq!(super::kms_region_from_key_arn(KEY_ID), Some("us-east-1"));
+        assert!(super::kms_region_from_key_arn("alias/ferrum-root").is_none());
+        assert!(super::kms_region_from_key_arn("12345678-1234-1234-1234-123456789012").is_none());
+        assert!(super::kms_region_from_key_arn(
+            "arn:aws:kms:us-east-1:12345678901:key/12345678-1234-1234-1234-123456789012"
+        )
+        .is_none());
+        assert!(super::kms_region_from_key_arn(
+            "arn:aws:kms:us-east-1:123456789012:alias/ferrum-root"
+        )
+        .is_none());
+    }
+
+    #[test]
+    fn context_digest_is_fixed_width_and_ceremony_bound() {
+        let first = super::kms_context_sha256_hex([0x11; 16]);
+        let second = super::kms_context_sha256_hex([0x22; 16]);
+        assert_eq!(first.len(), 64);
+        assert_ne!(first, second);
+        assert!(first.bytes().all(|byte| byte.is_ascii_hexdigit()));
     }
 
     #[test]
     fn invalid_kms_configuration_fails_closed() {
         assert!(AwsKmsUnsealer::new(FakeKms::default(), "", 1).is_err());
+        assert!(AwsKmsUnsealer::new(FakeKms::default(), "alias/ferrum-root", 1).is_err());
         assert!(AwsKmsUnsealer::new(FakeKms::default(), KEY_ID, 0).is_err());
+        assert_eq!(
+            AwsKmsUnsealer::new(FakeKms::default(), KEY_ID, 1)
+                .unwrap()
+                .key_id(),
+            KEY_ID
+        );
     }
 }

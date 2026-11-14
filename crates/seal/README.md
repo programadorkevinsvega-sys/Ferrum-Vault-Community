@@ -10,7 +10,7 @@ Phase 1.4 process-local seal lifecycle plus the Phase 1.5 provider-independent u
 - Bootstrap accepts only an exact 2-of-3 set of valid FRS1 shares from one ceremony. Recovery verifies the FRS1 integrity tag. The controller retains only the public random ceremony identifier, never the reconstructed root or recovery shares.
 - The mandatory default unseal path uses Shamir 2-of-3 only. The generic offline recovery crate keeps its separate 5-of-3 default.
 - The object-safe async provider port is `Unsealer`. `SealController::unseal` always selects `ShamirUnsealer`; another adapter requires an explicit `unseal_with` call and never becomes an automatic fallback.
-- The optional `aws-kms` feature is disabled by default. It adds no AWS SDK or credential provider dependency to the Ferrum core; the host application injects its SDK client.
+- The optional `aws-kms` feature is disabled by default. It isolates the official AWS SDK for Rust (`aws-config` and `aws-sdk-kms`) from the default/core dependency graph. Use `AwsKmsUnsealer::<AwsSdkKmsApi>::from_environment` to load the standard credential provider chain and pin the client to the configured KMS key ARN's region. Credentials are not embedded or hardcoded in Ferrum; the SDK resolves the environment's configured identity.
 - Seal transitions back to Sealed and drops the active root buffer. Wrong tokens, expired credentials, replay, wrong ceremonies, insufficient shares and concurrent stale transitions fail closed.
 
 ## Explicit limitations
@@ -42,3 +42,12 @@ The optional `aws-kms` feature is disabled by default. It exposes an injected KM
 KMS ciphertext is bound to a SHA-256 fingerprint of the canonical FVC1 seal-root context, including the public ceremony identifier. Only this digest is sent as KMS encryption context. See [the auto-unseal threat and recovery notes](../../docs/security/auto-unseal.md).
 
 Even when KMS auto-unseal is selected, `generate-root`, root rotation and root revocation still require the independently configured 2-of-3 RootQuorumPolicy. A principal with `kms:Decrypt` and access to the wrapped root can bypass the Shamir unseal ceremony, but that does not authorize these root operations. Treat `kms:Decrypt` as a high-impact privilege, restrict and audit it.
+
+
+## Optional AWS SDK for Rust adapter
+
+With `--features aws-kms`, `AwsSdkKmsApi` uses the official AWS SDK crates pinned in `crates/seal/Cargo.toml`. The default feature set does not compile or link `aws-config`, `aws-sdk-kms` or Tokio.
+
+`AwsKmsUnsealer::<AwsSdkKmsApi>::from_environment(key_arn, envelope_version)` requires a full regional customer-managed KMS key ARN, loads credentials via the SDK's standard provider chain, pins the region from that ARN and calls `DescribeKey`. It fails closed unless the ARN matches exactly and the key is enabled, `SYMMETRIC_DEFAULT` and `ENCRYPT_DECRYPT`. The credential chain can use temporary role credentials provided through environment configuration, shared AWS profiles/config, web identity, ECS/EKS workload roles or EC2 instance roles. Do not put access keys in source, build arguments or CI.
+
+For a real account round-trip, see [the AWS KMS IAM/CloudTrail guide](../../docs/security/auto-unseal.md) and run `scripts/aws-kms-live-verify.sh` from an environment with the intended AWS runtime identity. The verifier uses only a fresh random synthetic root, never production root material or Shamir shares.

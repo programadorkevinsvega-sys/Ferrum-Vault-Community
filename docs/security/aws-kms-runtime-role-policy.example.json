@@ -1,0 +1,30 @@
+{
+  "Version": "2012-10-17",
+  "Statement": [
+    {
+      "Sid": "DescribeFerrumRootKey",
+      "Effect": "Allow",
+      "Action": "kms:DescribeKey",
+      "Resource": "REPLACE_WITH_FULL_KMS_KEY_ARN"
+    },
+    {
+      "Sid": "FerrumSealRootCryptographicOperations",
+      "Effect": "Allow",
+      "Action": [
+        "kms:Encrypt",
+        "kms:Decrypt"
+      ],
+      "Resource": "REPLACE_WITH_FULL_KMS_KEY_ARN",
+      "Condition": {
+        "Null": {
+          "kms:EncryptionContext:FerrumContextSHA256V1": "false"
+        },
+        "ForAllValues:StringEquals": {
+          "kms:EncryptionContextKeys": [
+            "FerrumContextSHA256V1"
+          ]
+        }
+      }
+    }
+  ]
+}

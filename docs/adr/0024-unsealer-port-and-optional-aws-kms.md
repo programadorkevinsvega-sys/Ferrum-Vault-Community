@@ -11,7 +11,7 @@ The mandatory default adapter is Shamir with an exact 2-of-3 policy. Bootstrap b
 
 The default SealController::unseal path always invokes ShamirUnsealer. An alternate Unsealer can be invoked only through an explicit provider-selection call. Provider failure, denial, timeout, invalid configuration, wrong key/version, invalid ciphertext or context mismatch leaves the controller Sealed. The controller never silently switches providers. Manual Shamir recovery after an alternate-provider failure is a separate operator action.
 
-AWS KMS is optional, behind the `aws-kms` feature, and disabled by default. The Ferrum core does not link an AWS SDK, resolve AWS credentials or choose a region. The host application injects the KMS API bridge and owns the SDK and credentials. The adapter binds ciphertext to a SHA-256 fingerprint of canonical FVC1 context containing tenant=root, purpose=seal-root and the configured public ceremony identifier. KMS encryption context is non-secret and appears in plaintext in CloudTrail, so only the digest is sent.
+AWS KMS is optional, behind the `aws-kms` feature, and disabled by default. Only when this feature is enabled does `ferrum-seal` compile the official AWS SDK for Rust (`aws-config` and `aws-sdk-kms`); the default/core graph remains provider- and cloud-independent. `AwsKmsUnsealer::<AwsSdkKmsApi>::from_environment` uses the SDK's default credential provider chain (environment/shared profiles, web identity and workload/instance roles), derives the Region from the full KMS key ARN, and calls `DescribeKey` to verify the exact ARN, enabled state, symmetric key spec and ENCRYPT_DECRYPT usage. The SDK client's Encrypt/Decrypt methods use a SHA-256 fingerprint of canonical FVC1 context containing tenant=root, purpose=seal-root and the configured public ceremony identifier. KMS encryption context is non-secret and visible in CloudTrail, so only the digest is sent.
 
 ## Separate root-operation authorization
 
@@ -23,10 +23,17 @@ A principal with `kms:Decrypt` permission on the configured symmetric KMS key an
 
 KMS outages, access denial, throttling, timeout, disabled/deleted keys, wrong key/version, corrupted ciphertext or context mismatch leave the controller Sealed. Recovery via Shamir must be explicitly initiated; no automatic local-key or provider fallback is permitted.
 
-The KMS client abstraction is tested using an in-memory fake with synthetic roots and no credentials or live AWS calls. The optional feature is a transport bridge, not a claim that AWS account policy, credential issuance, network availability or production integration has been validated.
+CI tests use an in-memory fake and synthetic roots with no credentials or live AWS calls. The repository includes least-privilege runtime/audit IAM and key-policy examples plus `scripts/aws-kms-live-verify.sh`, which, when explicitly run in an authorized AWS environment, validates key metadata and key-policy delegation, simulates the runtime principal's DescribeKey/Encrypt/Decrypt permissions with the exact context, performs a synthetic SDK Encrypt/Decrypt round-trip and matches the exact context fingerprint in regional CloudTrail Event History. The client refuses AWS-managed keys and requires a customer-managed symmetric key with Encrypt/Decrypt usage. That operator-run account procedure is not represented as having passed until its result evidence is separately recorded.
 
 Wrapped-root metadata is not yet persisted or restart-safe. Durable encoding, atomic storage, bootstrap persistence and recovery after process restart remain Phase 1.7 scope.
 
 ## Consequences
 
 Community remains usable without AWS. The Shamir path is the mandatory baseline and AWS KMS is an optional integration. Other providers can implement the same Unsealer port without changing the core controller.
+
+
+## Official AWS SDK and live-verification boundary
+
+The optional feature pins `aws-config`, `aws-sdk-kms` and a Tokio runtime dependency. The AWS SDK crates remain optional and disabled by default. The client uses the default SDK credential provider chain and explicitly pins the Region parsed from the configured key ARN. It performs DescribeKey validation before use and rejects non-customer-key ARNs, disabled keys, non-symmetric key specs or key-usage mismatches.
+
+[The runtime IAM example](../security/aws-kms-runtime-role-policy.example.json), [key-policy statement](../security/aws-kms-key-policy-statement.example.json) and [separate audit role policy](../security/aws-kms-audit-role-policy.example.json) document the required permissions and context restriction. The live verification utility checks the effective key operations and CloudTrail Event History with synthetic non-production data; it must be run only by an explicitly authorized operator. CI continues to use the fake KMS and never receives cloud credentials.
