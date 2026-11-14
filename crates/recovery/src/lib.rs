@@ -430,6 +430,23 @@ mod tests {
     }
 
     #[test]
+    fn deterministic_property_sweep_covers_lengths_and_thresholds() {
+        for length in 1..=128 {
+            let secret: Vec<u8> = (0..length)
+                .map(|index| (index as u8).wrapping_mul(37).wrapping_add(length as u8))
+                .collect();
+
+            for (threshold, count) in [(2, 2), (2, 5), (3, 5), (4, 7), (5, 9)] {
+                let policy = RecoveryPolicy::new(threshold, count).unwrap();
+                let shares = deterministic_split(&secret, policy, length as u8);
+                let selected: Vec<_> = shares[..threshold].iter().map(copy_share).collect();
+                let recovered = recover_secret(&selected).unwrap();
+                assert_eq!(&*recovered, secret);
+            }
+        }
+    }
+
+    #[test]
     fn fewer_than_threshold_shares_are_rejected() {
         let shares = deterministic_split(b"root", RecoveryPolicy::default(), 0x42);
         let selected = [copy_share(&shares[0]), copy_share(&shares[1])];
@@ -556,8 +573,8 @@ mod tests {
     #[test]
     fn ceremony_generation_rejects_zero_length() {
         assert_eq!(
-            generate_secret_shares(0, RecoveryPolicy::default()),
-            Err(RecoveryError::EmptySecret)
+            generate_secret_shares(0, RecoveryPolicy::default()).unwrap_err(),
+            RecoveryError::EmptySecret
         );
     }
 }
