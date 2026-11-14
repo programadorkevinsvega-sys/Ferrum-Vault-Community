@@ -13,7 +13,7 @@ fuzz_target!(|data: &[u8]| {
     }
 
     // Fuzz-only deterministic randomness; never used by production ceremony code.
-    let secret_len = data.len().min(2048).max(1);
+    let secret_len = data.len().min(2048);
     let secret = &data[..secret_len];
     let mut rng = StdRng::from_seed([0xA7; 32]);
     let Ok(mut shares) = split_secret_with_rng(secret, RecoveryPolicy::default(), &mut rng) else {
@@ -33,7 +33,7 @@ fuzz_target!(|data: &[u8]| {
     if let Ok(mutated_share) = RecoveryShare::decode(&mutated) {
         shares.push(mutated_share);
         if let Ok(recovered) = recover_secret(&shares) {
-            assert_eq!(&*recovered, secret);
+            assert_eq!(recovered.as_slice(), secret);
         }
     }
 });
