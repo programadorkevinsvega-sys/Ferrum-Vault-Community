@@ -24,9 +24,11 @@ fuzz_target!(|data: &[u8]| {
     assert!(ShamirUnsealer::unseal_shares(ceremony_id, &duplicate).is_err());
 
     let mut corrupted_bytes = shares[0].as_bytes().to_vec();
-    for (index, byte) in data.iter().copied().enumerate().take(corrupted_bytes.len()) {
-        corrupted_bytes[index] ^= byte;
-    }
+    // Mutate one payload byte unconditionally. In particular, an empty
+    // fuzzer input must not leave the share unchanged and produce a false
+    // assertion failure.
+    let last = corrupted_bytes.len() - 1;
+    corrupted_bytes[last] ^= 0x80;
     if let Ok(corrupted) = RecoveryShare::decode(&corrupted_bytes) {
         let damaged = [corrupted, copy_share(&shares[1])];
         assert!(ShamirUnsealer::unseal_shares(ceremony_id, &damaged).is_err());
