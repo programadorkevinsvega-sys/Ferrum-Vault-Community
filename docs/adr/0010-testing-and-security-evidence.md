@@ -15,3 +15,10 @@ The planned CI quality gates include formatting, clippy with warnings denied, te
 ## Consequences
 
 Tests must not be weakened or removed merely to obtain a green pipeline. Flaky or excluded tests and their reasons must be documented. Every security claim must link to reproducible evidence; passing CI is not an external security audit.
+
+
+## Phase 1.4 evidence and technique boundaries
+
+The initial `ferrum-seal` implementation records 12 unit tests for bootstrap-token lifetime/expiry/replay, FRS1 ceremony binding, rejection paths, seal/unseal root availability, concurrent transitions and panic recovery. Deterministic root-length and valid-share-subset sweeps are not a substitute for proptest. The `seal_bootstrap_transitions` libFuzzer target generates synthetic secrets/shares at runtime and mutates recovery inputs and token encodings; its committed corpus must not contain valid shares, root material or bootstrap tokens.
+
+Exact-head PR CI evidence is recorded in [ROADMAP Phase 1.4](../../ROADMAP.md): cross-platform and MSRV validation, Miri for the pure-Rust KMP parser, and bounded fuzz smoke campaigns. Miri does not exercise AWS-LC FFI or establish memory safety of external code. No seal-specific Loom model, measured coverage result, Criterion benchmark, durable-store failure injection, or service-level crash/restart test is claimed in this phase. Add these techniques when the relevant synchronization/storage/service boundaries exist, or document a reviewed reason for any future exclusion.

@@ -47,7 +47,7 @@ No API-level rate limiting or durable audit sink exists yet. A service integrati
 
 ## Generate-root decision
 
-ADR-0014 still marks the exact generate-root quorum as pending. This implementation does not expose a generate-root endpoint, choose a threshold, derive a default, or supply a permissive implementation. That workflow remains blocked until the owner approves the exact quorum and its custody semantics.
+ADR-0014 still leaves the numeric M/N quorum and its operation scope unconfigured. This implementation does not expose a generate-root endpoint, choose a threshold, derive a default, or supply a permissive implementation. The operation must fail closed while quorum policy is absent or invalid. The recovery crate's separate 5/3 default must not be reused as an implicit generate-root policy. Any future quorum implementation must reject M−1 distinct fragments, accept M valid distinct fragments from one ceremony, and reject duplicates and corrupted fragments. Secret fragments, root material and bootstrap credentials must never enter the repository, logs, CI output, variables or artifacts; tests/fuzzers must generate synthetic values at runtime. Whether the same quorum applies to rotation or revocation remains unspecified. See ADR-0014. This workflow remains blocked until the owner supplies numeric M/N and the exact operation scope.
 
 ## Verification
 
