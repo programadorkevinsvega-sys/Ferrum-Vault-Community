@@ -16,7 +16,7 @@ pub enum UnsealSource<'a> {
     /// Offline recovery shares from the configured root ceremony.
     Shamir(&'a [RecoveryShare]),
     /// An opaque provider-wrapped root envelope. This path is never selected implicitly.
-    Kms(&'a WrappedRootEnvelope),
+    Wrapped(&'a WrappedRootEnvelope),
 }
 
 /// Opaque ciphertext metadata for an explicitly selected provider.
