@@ -226,17 +226,18 @@ pub fn split_secret_with_rng<R: CryptoRng>(
     header.extend_from_slice(&payload_len.to_be_bytes());
 
     let tag = calculate_tag(&header[..], secret, &check_key[..]);
-    let shares = Gf256::split_bytes(
-        policy.threshold(),
-        policy.share_count(),
-        &*protected_secret,
-        rng,
-    )
-    .map_err(|_| RecoveryError::SplitFailed)?;
+    let mut shares = Zeroizing::new(
+        Gf256::split_bytes(
+            policy.threshold(),
+            policy.share_count(),
+            &*protected_secret,
+            rng,
+        )
+        .map_err(|_| RecoveryError::SplitFailed)?,
+    );
 
     let mut encoded_shares = Vec::with_capacity(shares.len());
-    for raw_share in shares {
-        let mut raw_share = Zeroizing::new(raw_share);
+    for raw_share in shares.iter_mut() {
         let mut encoded = Zeroizing::new(Vec::with_capacity(HEADER_LEN + raw_share.len()));
         encoded.extend_from_slice(&header[..]);
         encoded.extend_from_slice(&tag);
