@@ -11,9 +11,7 @@ use async_trait::async_trait;
 use aws_lc_rs::digest::{self, SHA256};
 use zeroize::Zeroizing;
 
-use crate::unsealer::{
-    KmsWrappedRoot, UnsealRequest, UnsealSource, Unsealer, UnsealerError,
-};
+use crate::unsealer::{KmsWrappedRoot, UnsealRequest, UnsealSource, Unsealer, UnsealerError};
 
 pub const AWS_KMS_CONTEXT_KEY: &str = "FerrumContextSHA256V1";
 pub const AWS_KMS_ALGORITHM: &str = "AWS-KMS";
@@ -347,8 +345,8 @@ mod tests {
         let controller = sealed_controller(&shares, true);
         let fake = FakeKms::default();
         let adapter = AwsKmsUnsealer::new(fake, KEY_ID, 1).unwrap();
-        let wrapped = block_on(adapter.encrypt_root_for_unseal(root, shares[0].ceremony_id()))
-            .unwrap();
+        let wrapped =
+            block_on(adapter.encrypt_root_for_unseal(root, shares[0].ceremony_id())).unwrap();
 
         block_on(controller.unseal_with(&adapter, UnsealSource::Kms(&wrapped))).unwrap();
         assert_eq!(controller.snapshot().status, SealStatus::Unsealed);
@@ -366,11 +364,13 @@ mod tests {
                 controller.with_root_quorum(operation, &shares[..1], |_| true),
                 Err(SealError::RootQuorumRejected)
             );
-            assert!(controller
-                .with_root_quorum(operation, &shares[..2], |context| {
-                    context.operation == operation
-                })
-                .unwrap());
+            assert!(
+                controller
+                    .with_root_quorum(operation, &shares[..2], |context| {
+                        context.operation == operation
+                    })
+                    .unwrap()
+            );
         }
     }
 
@@ -380,16 +380,12 @@ mod tests {
         let shares = make_shares(root);
         let controller = sealed_controller(&shares, false);
         let adapter = AwsKmsUnsealer::new(FakeKms::default(), KEY_ID, 1).unwrap();
-        let wrapped = block_on(adapter.encrypt_root_for_unseal(root, shares[0].ceremony_id()))
-            .unwrap();
+        let wrapped =
+            block_on(adapter.encrypt_root_for_unseal(root, shares[0].ceremony_id())).unwrap();
         block_on(controller.unseal_with(&adapter, UnsealSource::Kms(&wrapped))).unwrap();
 
         assert_eq!(
-            controller.with_root_quorum(
-                RootQuorumOperation::GenerateRoot,
-                &shares[..2],
-                |_| ()
-            ),
+            controller.with_root_quorum(RootQuorumOperation::GenerateRoot, &shares[..2], |_| ()),
             Err(SealError::QuorumNotConfigured)
         );
     }
@@ -401,8 +397,8 @@ mod tests {
         let controller = sealed_controller(&shares, true);
         let fake = FakeKms::default();
         let adapter = AwsKmsUnsealer::new(fake, KEY_ID, 1).unwrap();
-        let wrapped = block_on(adapter.encrypt_root_for_unseal(root, shares[0].ceremony_id()))
-            .unwrap();
+        let wrapped =
+            block_on(adapter.encrypt_root_for_unseal(root, shares[0].ceremony_id())).unwrap();
         // This is a test-only fault injection into the same fake KMS state.
         adapter.client.set_failure(Some(KmsApiError::AccessDenied));
 
@@ -424,11 +420,9 @@ mod tests {
         let second_shares = make_shares(b"synthetic second KMS ceremony root");
         let controller = sealed_controller(&second_shares, false);
         let adapter = AwsKmsUnsealer::new(FakeKms::default(), KEY_ID, 1).unwrap();
-        let wrapped = block_on(adapter.encrypt_root_for_unseal(
-            first_root,
-            first_shares[0].ceremony_id(),
-        ))
-        .unwrap();
+        let wrapped =
+            block_on(adapter.encrypt_root_for_unseal(first_root, first_shares[0].ceremony_id()))
+                .unwrap();
 
         assert_eq!(
             block_on(controller.unseal_with(&adapter, UnsealSource::Kms(&wrapped))),
@@ -468,15 +462,12 @@ mod tests {
         let controller = sealed_controller(&shares, false);
         let fake = FakeKms::default();
         let adapter = AwsKmsUnsealer::new(fake, KEY_ID, 1).unwrap();
-        let wrapped = block_on(adapter.encrypt_root_for_unseal(root, shares[0].ceremony_id()))
-            .unwrap();
+        let wrapped =
+            block_on(adapter.encrypt_root_for_unseal(root, shares[0].ceremony_id())).unwrap();
         adapter.client.set_failure(Some(KmsApiError::Timeout));
         assert_eq!(
-            block_on(adapter.unseal(UnsealRequest::from_kms(
-                shares[0].ceremony_id(),
-                &wrapped
-            )))
-            .err(),
+            block_on(adapter.unseal(UnsealRequest::from_kms(shares[0].ceremony_id(), &wrapped)))
+                .err(),
             Some(UnsealerError::ProviderTimeout)
         );
         assert_eq!(
@@ -490,13 +481,34 @@ mod tests {
     fn kms_errors_map_to_non_sensitive_provider_classes() {
         use crate::UnsealerError;
 
-        assert_eq!(super::map_kms_error(KmsApiError::AccessDenied), UnsealerError::AccessDenied);
-        assert_eq!(super::map_kms_error(KmsApiError::InvalidCiphertext), UnsealerError::AuthenticationFailed);
-        assert_eq!(super::map_kms_error(KmsApiError::KeyUnavailable), UnsealerError::ProviderUnavailable);
-        assert_eq!(super::map_kms_error(KmsApiError::Throttled), UnsealerError::ProviderUnavailable);
-        assert_eq!(super::map_kms_error(KmsApiError::Transport), UnsealerError::ProviderUnavailable);
-        assert_eq!(super::map_kms_error(KmsApiError::Timeout), UnsealerError::ProviderTimeout);
-        assert_eq!(super::map_kms_error(KmsApiError::Failure), UnsealerError::ProviderFailure);
+        assert_eq!(
+            super::map_kms_error(KmsApiError::AccessDenied),
+            UnsealerError::AccessDenied
+        );
+        assert_eq!(
+            super::map_kms_error(KmsApiError::InvalidCiphertext),
+            UnsealerError::AuthenticationFailed
+        );
+        assert_eq!(
+            super::map_kms_error(KmsApiError::KeyUnavailable),
+            UnsealerError::ProviderUnavailable
+        );
+        assert_eq!(
+            super::map_kms_error(KmsApiError::Throttled),
+            UnsealerError::ProviderUnavailable
+        );
+        assert_eq!(
+            super::map_kms_error(KmsApiError::Transport),
+            UnsealerError::ProviderUnavailable
+        );
+        assert_eq!(
+            super::map_kms_error(KmsApiError::Timeout),
+            UnsealerError::ProviderTimeout
+        );
+        assert_eq!(
+            super::map_kms_error(KmsApiError::Failure),
+            UnsealerError::ProviderFailure
+        );
     }
 
     #[test]

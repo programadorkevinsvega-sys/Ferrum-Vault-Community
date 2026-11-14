@@ -16,9 +16,9 @@ use aws_lc_rs::rand::{SecureRandom, SystemRandom};
 use ferrum_recovery::{RecoveryPolicy, RecoveryShare, recover_secret};
 use zeroize::Zeroizing;
 
-pub mod unsealer;
 #[cfg(feature = "aws-kms")]
 pub mod aws_kms;
+pub mod unsealer;
 pub use unsealer::{
     KmsWrappedRoot, ShamirUnsealer, UnsealRequest, UnsealSource, Unsealer, UnsealerError,
 };

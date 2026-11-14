@@ -145,10 +145,8 @@ impl std::error::Error for UnsealerError {}
 /// implicit provider fallback.
 #[async_trait]
 pub trait Unsealer: Send + Sync {
-    async fn unseal(
-        &self,
-        request: UnsealRequest<'_>,
-    ) -> Result<Zeroizing<Vec<u8>>, UnsealerError>;
+    async fn unseal(&self, request: UnsealRequest<'_>)
+    -> Result<Zeroizing<Vec<u8>>, UnsealerError>;
 }
 
 /// Mandatory and default Community unseal adapter: Shamir 2-of-3.
@@ -164,9 +162,9 @@ impl ShamirUnsealer {
         expected_ceremony_id: [u8; 16],
         shares: &[RecoveryShare],
     ) -> Result<Zeroizing<Vec<u8>>, UnsealerError> {
-        let required = RecoveryPolicy::new(2, 3).map_err(|_| UnsealerError::InvalidConfiguration)?;
-        if !(2..=3).contains(&shares.len())
-            || shares.iter().any(|share| share.policy() != required)
+        let required =
+            RecoveryPolicy::new(2, 3).map_err(|_| UnsealerError::InvalidConfiguration)?;
+        if !(2..=3).contains(&shares.len()) || shares.iter().any(|share| share.policy() != required)
         {
             return Err(UnsealerError::QuorumRejected);
         }
