@@ -679,8 +679,16 @@ mod tests {
         });
 
         barrier.wait();
-        let first_won = if first.join().expect("first thread") { 1 } else { 0 };
-        let second_won = if second.join().expect("second thread") { 1 } else { 0 };
+        let first_won = if first.join().expect("first thread") {
+            1
+        } else {
+            0
+        };
+        let second_won = if second.join().expect("second thread") {
+            1
+        } else {
+            0
+        };
         let winners = first_won + second_won;
         assert_eq!(winners, 1);
         assert_eq!(controller.snapshot().status, SealStatus::Unsealed);
