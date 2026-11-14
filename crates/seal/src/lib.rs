@@ -263,8 +263,7 @@ impl SealController {
             (pending.verifier, inner.generation)
         };
 
-        let ceremony_id =
-            matching_ceremony_id(shares).ok_or(SealError::BootstrapRejected)?;
+        let ceremony_id = matching_ceremony_id(shares).ok_or(SealError::BootstrapRejected)?;
         let recovered = recover_secret(shares).map_err(|_| SealError::BootstrapRejected)?;
         drop(recovered);
 
@@ -315,8 +314,7 @@ impl SealController {
             )
         };
 
-        let supplied_ceremony_id =
-            matching_ceremony_id(shares).ok_or(SealError::UnsealRejected)?;
+        let supplied_ceremony_id = matching_ceremony_id(shares).ok_or(SealError::UnsealRejected)?;
         if !constant_time_equal(&expected_ceremony_id, &supplied_ceremony_id) {
             return Err(SealError::UnsealRejected);
         }
