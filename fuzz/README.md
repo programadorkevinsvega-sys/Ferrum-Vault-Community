@@ -14,6 +14,8 @@ that introduces the relevant parser, envelope or protocol; do not defer fuzzing.
 | `authentication_mutations` | Changes to AAD, nonce, ciphertext or tag always fail authentication and return no plaintext. |
 | `wrapped_key_decode` | Arbitrary bytes never panic the FVK1 parser; accepted envelopes re-encode byte-for-byte canonically. |
 | `key_context_mutations` | Mutating the caller scope after AES-GCM wrapping always fails authentication. |
+| `recovery_share_decode` | Arbitrary FRS1 input never panics; accepted envelopes remain byte-for-byte canonical. |
+| `recovery_share_mutations` | Mutated Shamir shares either fail closed or reconstruct only the original test input. |
 
 The AES-GCM primitive's `SealedPayload` keeps the nonce at `[u8; 12]` and
 ciphertext/tag bytes separately. The KMP layer adds the serialized FVK1
@@ -35,6 +37,8 @@ cargo +nightly-2026-11-12 fuzz run open_arbitrary_payload -- -max_total_time=300
 cargo +nightly-2026-11-12 fuzz run authentication_mutations -- -max_total_time=300 -max_len=65536 -timeout=10
 cargo +nightly-2026-11-12 fuzz run wrapped_key_decode -- -max_total_time=300 -max_len=65536 -timeout=10
 cargo +nightly-2026-11-12 fuzz run key_context_mutations -- -max_total_time=300 -max_len=65536 -timeout=10
+cargo +nightly-2026-11-12 fuzz run recovery_share_decode -- -max_total_time=300 -max_len=65536 -timeout=10
+cargo +nightly-2026-11-12 fuzz run recovery_share_mutations -- -max_total_time=300 -max_len=65536 -timeout=10
 ```
 
 ## CI policy
@@ -48,6 +52,9 @@ cargo +nightly-2026-11-12 fuzz run key_context_mutations -- -max_total_time=300 
 - Commit curated, named seed inputs; do not commit every generated corpus mutation.
 - The fuzz time budget is an execution budget, not proof of exhaustive coverage or
   absence of vulnerabilities.
+- Recovery fuzzing uses synthetic runtime-generated values. The committed
+  `recovery_share_decode` seed is a malformed FRS1 prefix, not a valid share or
+  root-secret fixture. Never commit ceremony material or valid recovery shares.
 
 ## Other test techniques
 
