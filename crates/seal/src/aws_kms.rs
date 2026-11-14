@@ -759,10 +759,7 @@ mod tests {
     fn key_arn_parser_requires_a_regional_customer_key_arn() {
         assert_eq!(super::kms_region_from_key_arn(KEY_ID), Some("us-east-1"));
         assert!(super::kms_region_from_key_arn("alias/ferrum-root").is_none());
-        assert!(super::kms_region_from_key_arn(
-            "12345678-1234-1234-1234-123456789012"
-        )
-        .is_none());
+        assert!(super::kms_region_from_key_arn("12345678-1234-1234-1234-123456789012").is_none());
         assert!(
             super::kms_region_from_key_arn(
                 "arn:aws:kms:us-east-1:12345678901:key/12345678-1234-1234-1234-123456789012"
