@@ -11,7 +11,7 @@ use async_trait::async_trait;
 use aws_lc_rs::digest::{self, SHA256};
 use zeroize::Zeroizing;
 
-use crate::unsealer::{KmsWrappedRoot, UnsealRequest, UnsealSource, Unsealer, UnsealerError};
+use crate::unsealer::{WrappedRootEnvelope, UnsealRequest, UnsealSource, Unsealer, UnsealerError};
 
 pub const AWS_KMS_CONTEXT_KEY: &str = "FerrumContextSHA256V1";
 pub const AWS_KMS_ALGORITHM: &str = "AWS-KMS";
@@ -124,7 +124,7 @@ impl<C: AwsKmsApi> AwsKmsUnsealer<C> {
         &self,
         root: &[u8],
         ceremony_id: [u8; 16],
-    ) -> Result<KmsWrappedRoot, UnsealerError> {
+    ) -> Result<WrappedRootEnvelope, UnsealerError> {
         if root.is_empty() {
             return Err(UnsealerError::InvalidWrappedRoot);
         }
@@ -137,7 +137,7 @@ impl<C: AwsKmsApi> AwsKmsUnsealer<C> {
         if encrypted.key_id != self.key_id || encrypted.ciphertext.is_empty() {
             return Err(UnsealerError::AuthenticationFailed);
         }
-        KmsWrappedRoot::new(self.key_id.clone(), self.key_version, encrypted.ciphertext)
+        WrappedRootEnvelope::new(self.key_id.clone(), self.key_version, encrypted.ciphertext)
     }
 }
 
@@ -148,7 +148,7 @@ impl<C: AwsKmsApi> Unsealer for AwsKmsUnsealer<C> {
         request: UnsealRequest<'_>,
     ) -> Result<Zeroizing<Vec<u8>>, UnsealerError> {
         let wrapped = match request.source() {
-            UnsealSource::Kms(wrapped) => wrapped,
+            UnsealSource::Wrapped(wrapped) => wrapped,
             UnsealSource::Shamir(_) => return Err(UnsealerError::InvalidSource),
         };
         if wrapped.key_id() != self.key_id || wrapped.key_version() != self.key_version {
@@ -220,7 +220,7 @@ fn append_context_field(output: &mut Vec<u8>, value: &[u8]) {
 mod tests {
     use super::{AwsKmsApi, AwsKmsUnsealer, KmsApiError, KmsCiphertext, KmsPlaintext};
     use crate::{
-        KmsWrappedRoot, RootQuorumOperation, RootQuorumPolicy, SealController, SealError,
+        WrappedRootEnvelope, RootQuorumOperation, RootQuorumPolicy, SealController, SealError,
         SealStatus, UnsealRequest, UnsealSource, Unsealer, UnsealerError,
     };
     use async_trait::async_trait;
@@ -348,7 +348,7 @@ mod tests {
         let wrapped =
             block_on(adapter.encrypt_root_for_unseal(root, shares[0].ceremony_id())).unwrap();
 
-        block_on(controller.unseal_with(&adapter, UnsealSource::Kms(&wrapped))).unwrap();
+        block_on(controller.unseal_with(&adapter, UnsealSource::Wrapped(&wrapped))).unwrap();
         assert_eq!(controller.snapshot().status, SealStatus::Unsealed);
         assert_eq!(
             controller.with_root_key(|value| value.to_vec()).unwrap(),
@@ -382,7 +382,7 @@ mod tests {
         let adapter = AwsKmsUnsealer::new(FakeKms::default(), KEY_ID, 1).unwrap();
         let wrapped =
             block_on(adapter.encrypt_root_for_unseal(root, shares[0].ceremony_id())).unwrap();
-        block_on(controller.unseal_with(&adapter, UnsealSource::Kms(&wrapped))).unwrap();
+        block_on(controller.unseal_with(&adapter, UnsealSource::Wrapped(&wrapped))).unwrap();
 
         assert_eq!(
             controller.with_root_quorum(RootQuorumOperation::GenerateRoot, &shares[..2], |_| ()),
@@ -403,7 +403,7 @@ mod tests {
         adapter.client.set_failure(Some(KmsApiError::AccessDenied));
 
         assert_eq!(
-            block_on(controller.unseal_with(&adapter, UnsealSource::Kms(&wrapped))),
+            block_on(controller.unseal_with(&adapter, UnsealSource::Wrapped(&wrapped))),
             Err(SealError::UnsealRejected)
         );
         assert_eq!(controller.snapshot().status, SealStatus::Sealed);
@@ -425,7 +425,7 @@ mod tests {
                 .unwrap();
 
         assert_eq!(
-            block_on(controller.unseal_with(&adapter, UnsealSource::Kms(&wrapped))),
+            block_on(controller.unseal_with(&adapter, UnsealSource::Wrapped(&wrapped))),
             Err(SealError::UnsealRejected)
         );
         assert_eq!(controller.snapshot().status, SealStatus::Sealed);
@@ -437,19 +437,19 @@ mod tests {
         let shares = make_shares(root);
         let controller = sealed_controller(&shares, false);
         let adapter = AwsKmsUnsealer::new(FakeKms::default(), KEY_ID, 1).unwrap();
-        let wrong_key = KmsWrappedRoot::new(
+        let wrong_key = WrappedRootEnvelope::new(
             "arn:aws:kms:us-east-1:111122223333:key/ffffffff-ffff-ffff-ffff-ffffffffffff",
             1,
             vec![1, 2, 3],
         )
         .unwrap();
         assert_eq!(
-            block_on(controller.unseal_with(&adapter, UnsealSource::Kms(&wrong_key))),
+            block_on(controller.unseal_with(&adapter, UnsealSource::Wrapped(&wrong_key))),
             Err(SealError::UnsealRejected)
         );
-        let wrong_version = KmsWrappedRoot::new(KEY_ID, 2, vec![1, 2, 3]).unwrap();
+        let wrong_version = WrappedRootEnvelope::new(KEY_ID, 2, vec![1, 2, 3]).unwrap();
         assert_eq!(
-            block_on(controller.unseal_with(&adapter, UnsealSource::Kms(&wrong_version))),
+            block_on(controller.unseal_with(&adapter, UnsealSource::Wrapped(&wrong_version))),
             Err(SealError::UnsealRejected)
         );
         assert_eq!(controller.snapshot().status, SealStatus::Sealed);
@@ -466,12 +466,12 @@ mod tests {
             block_on(adapter.encrypt_root_for_unseal(root, shares[0].ceremony_id())).unwrap();
         adapter.client.set_failure(Some(KmsApiError::Timeout));
         assert_eq!(
-            block_on(adapter.unseal(UnsealRequest::from_kms(shares[0].ceremony_id(), &wrapped)))
+            block_on(adapter.unseal(UnsealRequest::from_wrapped(shares[0].ceremony_id(), &wrapped)))
                 .err(),
             Some(UnsealerError::ProviderTimeout)
         );
         assert_eq!(
-            block_on(controller.unseal_with(&adapter, UnsealSource::Kms(&wrapped))),
+            block_on(controller.unseal_with(&adapter, UnsealSource::Wrapped(&wrapped))),
             Err(SealError::UnsealRejected)
         );
         assert_eq!(controller.snapshot().status, SealStatus::Sealed);

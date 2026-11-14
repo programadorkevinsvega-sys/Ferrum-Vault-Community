@@ -20,7 +20,7 @@ use zeroize::Zeroizing;
 pub mod aws_kms;
 pub mod unsealer;
 pub use unsealer::{
-    KmsWrappedRoot, ShamirUnsealer, UnsealRequest, UnsealSource, Unsealer, UnsealerError,
+    WrappedRootEnvelope, ShamirUnsealer, UnsealRequest, UnsealSource, Unsealer, UnsealerError,
 };
 
 const BOOTSTRAP_TOKEN_LEN: usize = 32;

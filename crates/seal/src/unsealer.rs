@@ -15,21 +15,21 @@ use zeroize::Zeroizing;
 pub enum UnsealSource<'a> {
     /// Offline recovery shares from the configured root ceremony.
     Shamir(&'a [RecoveryShare]),
-    /// A provider-wrapped root. This path is never selected implicitly.
-    Kms(&'a KmsWrappedRoot),
+    /// An opaque provider-wrapped root envelope. This path is never selected implicitly.
+    Kms(&'a WrappedRootEnvelope),
 }
 
-/// Ciphertext metadata required by an opt-in KMS unsealer.
+/// Opaque ciphertext metadata for an explicitly selected provider.
 ///
 /// This object is not a persistence format. Durable encoding and storage are
 /// part of Phase 1.7. Debug output never includes ciphertext bytes.
-pub struct KmsWrappedRoot {
+pub struct WrappedRootEnvelope {
     key_id: String,
     key_version: u64,
     ciphertext: Vec<u8>,
 }
 
-impl KmsWrappedRoot {
+impl WrappedRootEnvelope {
     pub fn new(
         key_id: impl Into<String>,
         key_version: u64,
@@ -50,7 +50,7 @@ impl KmsWrappedRoot {
         &self.key_id
     }
 
-    /// Logical envelope version, not the underlying KMS key-material version.
+    /// Provider-specific envelope version, not a key-material version.
     pub fn key_version(&self) -> u64 {
         self.key_version
     }
@@ -60,10 +60,10 @@ impl KmsWrappedRoot {
     }
 }
 
-impl fmt::Debug for KmsWrappedRoot {
+impl fmt::Debug for WrappedRootEnvelope {
     fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
         formatter
-            .debug_struct("KmsWrappedRoot")
+            .debug_struct("WrappedRootEnvelope")
             .field("key_id", &self.key_id)
             .field("key_version", &self.key_version)
             .field("ciphertext_len", &self.ciphertext.len())
@@ -89,8 +89,8 @@ impl<'a> UnsealRequest<'a> {
         Self::from_source(expected_ceremony_id, UnsealSource::Shamir(shares))
     }
 
-    pub fn from_kms(expected_ceremony_id: [u8; 16], wrapped_root: &'a KmsWrappedRoot) -> Self {
-        Self::from_source(expected_ceremony_id, UnsealSource::Kms(wrapped_root))
+    pub fn from_wrapped(expected_ceremony_id: [u8; 16], wrapped_root: &'a WrappedRootEnvelope) -> Self {
+        Self::from_source(expected_ceremony_id, UnsealSource::Wrapped(wrapped_root))
     }
 
     pub fn expected_ceremony_id(&self) -> [u8; 16] {
@@ -193,7 +193,7 @@ impl Unsealer for ShamirUnsealer {
             UnsealSource::Shamir(shares) => {
                 Self::unseal_shares(request.expected_ceremony_id(), shares)
             }
-            UnsealSource::Kms(_) => Err(UnsealerError::InvalidSource),
+            UnsealSource::Wrapped(_) => Err(UnsealerError::InvalidSource),
         }
     }
 }
