@@ -295,10 +295,14 @@ pub fn recover_secret(shares: &[RecoveryShare]) -> Result<Zeroizing<Vec<u8>>, Re
 
     let (root_secret, check_key) = combined.split_at(secret_len);
     let key = Key::new(HMAC_SHA256, check_key);
-    let mut authenticated = Zeroizing::new(first_parts.header.to_vec());
+    let mut authenticated = Zeroizing::new(
+        Vec::with_capacity(MAC_DOMAIN.len() + first_parts.header.len() + root_secret.len()),
+    );
+    authenticated.extend_from_slice(MAC_DOMAIN);
+    authenticated.extend_from_slice(first_parts.header);
     authenticated.extend_from_slice(root_secret);
 
-    hmac::verify(&key, &authenticated, first_parts.tag)
+    hmac::verify(&key, &authenticated[..], first_parts.tag)
         .map_err(|_| RecoveryError::AuthenticationFailed)?;
 
     Ok(Zeroizing::new(root_secret.to_vec()))
