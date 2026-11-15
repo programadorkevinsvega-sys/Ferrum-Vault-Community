@@ -1719,9 +1719,7 @@ mod tests {
         let envelope = BarrierEnvelope::decode(&stored.1).unwrap();
         assert_eq!(envelope.key_version(), 2);
         assert_eq!(
-            cipher
-                .open(&path, &stored.1)
-                .unwrap(),
+            cipher.open(&path, &stored.1).unwrap(),
             b"concurrent writer value"
         );
         assert_ne!(stored.1, concurrent);
