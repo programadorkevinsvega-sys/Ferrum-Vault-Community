@@ -22,7 +22,7 @@ impl NonceUsageLedger for FuzzLedger {
         &self,
         _key_id: &KeyId,
         _key_version: u64,
-        count: NonZeroU64,
+        config: NonceBudgetConfig,
     ) -> Result<NonceReservation, NonceLedgerError> {
         let mut high_water = self
             .high_water
@@ -32,7 +32,7 @@ impl NonceUsageLedger for FuzzLedger {
             *high_water = 1;
         }
         let end = high_water
-            .checked_add(count.get())
+            .checked_add(config.reservation_block_size().get())
             .ok_or(NonceLedgerError::CounterExhausted)?;
         let reservation = NonceReservation::new(*high_water, end)?;
         *high_water = end;

@@ -1525,7 +1525,7 @@ mod tests {
         let ledger = Arc::new(MemoryLedger::default());
         let config = NonceBudgetConfig::new(
             NonZeroU64::new(2).unwrap(),
-            NonZeroU64::new(8).unwrap(),
+            NonZeroU64::new(6).unwrap(),
         )
         .unwrap();
         let first = NonceBudget::new(config, ledger.clone());
