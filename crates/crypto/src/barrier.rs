@@ -1177,9 +1177,16 @@ impl RotationEngine {
             }
         }
 
-        let complete = page.complete;
+        // A CAS conflict means a row may still require migration. Rewind
+        // the checkpoint to the start of this page and retry it on the next
+        // invocation; already migrated rows authenticate as active-version
+        // rows and are safely skipped. Never report completion while a
+        // conflict remains unresolved.
+        let complete = page.complete && conflicts == 0;
         let next_cursor = if complete {
             None
+        } else if conflicts > 0 {
+            checkpoint.cursor().map(ToOwned::to_owned)
         } else {
             page.next_cursor().map(ToOwned::to_owned)
         };
@@ -1277,6 +1284,7 @@ mod tests {
     #[derive(Default)]
     struct MemoryRotationStore {
         state: Mutex<RotationState>,
+        conflict_once: Mutex<Option<Vec<u8>>>,
     }
 
     impl MemoryRotationStore {
@@ -1300,6 +1308,10 @@ mod tests {
 
         fn audit_count(&self) -> usize {
             self.state.lock().unwrap().audit.len()
+        }
+
+        fn cause_next_conflict(&self, concurrent_envelope: Vec<u8>) {
+            *self.conflict_once.lock().unwrap() = Some(concurrent_envelope);
         }
     }
 
@@ -1364,6 +1376,18 @@ mod tests {
                 .state
                 .lock()
                 .map_err(|_| RotationStoreError::Unavailable)?;
+            if let Some(concurrent_envelope) = self
+                .conflict_once
+                .lock()
+                .map_err(|_| RotationStoreError::Unavailable)?
+                .take()
+            {
+                state
+                    .records
+                    .insert(path.as_bytes().to_vec(), concurrent_envelope);
+                state.audit.push(conflict_event);
+                return Ok(false);
+            }
             let Some(current) = state.records.get(path.as_bytes()) else {
                 state.audit.push(conflict_event);
                 return Ok(false);
@@ -1658,6 +1682,49 @@ mod tests {
             assert!(plaintext == b"alpha" || plaintext == b"beta");
         }
         assert!(store.audit_count() >= 5);
+    }
+
+    #[test]
+    fn rotation_conflict_rewinds_page_and_resumes_until_all_rows_are_active() {
+        let cipher = test_cipher();
+        let path = CanonicalPath::new(b"kv/conflicting-write".to_vec()).unwrap();
+        let initial = cipher.seal(&path, b"initial value").unwrap();
+
+        cipher
+            .keyring()
+            .install_and_activate(2, [0x99; 32])
+            .unwrap();
+        let concurrent = cipher.seal(&path, b"concurrent writer value").unwrap();
+
+        let store = MemoryRotationStore::default();
+        store.insert(path.clone(), initial);
+        store.cause_next_conflict(concurrent.clone());
+
+        let engine = RotationEngine::new(cipher.clone());
+        let first = engine
+            .run_page(&store, "rotation-conflict", NonZeroUsize::new(1).unwrap())
+            .unwrap();
+        assert_eq!(first.conflicts, 1);
+        assert!(!first.complete);
+
+        let resumed = RotationEngine::new(cipher.clone());
+        let second = resumed
+            .run_page(&store, "rotation-conflict", NonZeroUsize::new(1).unwrap())
+            .unwrap();
+        assert_eq!(second.conflicts, 0);
+        assert_eq!(second.reencrypted, 0);
+        assert!(second.complete);
+
+        let stored = store.records().pop().expect("record remains stored");
+        let envelope = BarrierEnvelope::decode(&stored.1).unwrap();
+        assert_eq!(envelope.key_version(), 2);
+        assert_eq!(
+            cipher
+                .open(&path, &stored.1)
+                .unwrap(),
+            b"concurrent writer value"
+        );
+        assert_ne!(stored.1, concurrent);
     }
 
     #[test]
