@@ -413,15 +413,16 @@ impl NonceReservation {
 /// Atomic storage contract for per-key-version nonce-use reservations.
 ///
 /// Implementations must serialize concurrent callers and processes, persist
-/// the new high-water mark before returning, never overlap ranges, and never
-/// roll a reservation back. A range that may have been partially used is
-/// permanently spent after process failure or loss of proof of consumption.
+/// the policy and high-water mark for each key version, reject attempts to
+/// change that policy, persist the new mark before returning, never overlap
+/// ranges, and never roll a reservation back. A possibly used range is spent
+/// permanently after failure or loss of proof of consumption.
 pub trait NonceUsageLedger: Send + Sync {
     fn reserve(
         &self,
         key_id: &KeyId,
         key_version: u64,
-        count: NonZeroU64,
+        config: NonceBudgetConfig,
     ) -> Result<NonceReservation, NonceLedgerError>;
 }
 
@@ -517,7 +518,7 @@ impl NonceBudget {
         let reservation = self.ledger.reserve(
             key_id,
             key_version,
-            self.config.reservation_block_size,
+            self.config,
         )?;
         let reserved_count = reservation
             .end_exclusive
@@ -602,7 +603,8 @@ impl BarrierKeyring {
                 return Err(BarrierError::InvalidConfiguration);
             }
         }
-        if !registered.contains_key(&active_version) {
+        let highest_version = registered.keys().next_back().copied();
+        if !registered.contains_key(&active_version) || highest_version != Some(active_version) {
             return Err(BarrierError::InvalidConfiguration);
         }
         Ok(Self {
@@ -623,19 +625,6 @@ impl BarrierKeyring {
             .read()
             .map(|state| state.active_version)
             .map_err(|_| BarrierError::LockPoisoned)
-    }
-
-    fn active_provider(&self) -> Result<(u64, Arc<Aes256GcmProvider>), BarrierError> {
-        let state = self
-            .state
-            .read()
-            .map_err(|_| BarrierError::LockPoisoned)?;
-        let provider = state
-            .keys
-            .get(&state.active_version)
-            .cloned()
-            .ok_or(BarrierError::KeyNotFound)?;
-        Ok((state.active_version, provider))
     }
 
     fn provider_for(&self, version: u64) -> Result<Arc<Aes256GcmProvider>, BarrierError> {
@@ -768,7 +757,32 @@ impl BarrierCipher {
         path: &CanonicalPath,
         plaintext: &[u8],
     ) -> Result<Vec<u8>, BarrierError> {
-        let (key_version, provider) = self.keyring.active_provider()?;
+        self.seal_for_version(path, plaintext, None)
+    }
+
+    fn seal_for_version(
+        &self,
+        path: &CanonicalPath,
+        plaintext: &[u8],
+        required_version: Option<u64>,
+    ) -> Result<Vec<u8>, BarrierError> {
+        // Hold the keyring read lock through nonce reservation and encryption.
+        // Activation takes the write lock, so an old-version write cannot
+        // complete after the new version becomes active.
+        let state = self
+            .keyring
+            .state
+            .read()
+            .map_err(|_| BarrierError::LockPoisoned)?;
+        let key_version = state.active_version;
+        if required_version.is_some_and(|required| required != key_version) {
+            return Err(BarrierError::ActiveKeyVersionChanged);
+        }
+        let provider = state
+            .keys
+            .get(&key_version)
+            .cloned()
+            .ok_or(BarrierError::KeyNotFound)?;
         self.nonce_budget
             .consume(&self.keyring.key_id, key_version)?;
         let aad = BarrierAad::new(path, key_version)?;
@@ -1137,7 +1151,7 @@ impl RotationEngine {
             let plaintext = Zeroizing::new(
                 self.barrier.open(record.path(), record.envelope())?,
             );
-            let replacement = self.barrier.seal(record.path(), &plaintext)?;
+            let replacement = self.barrier.seal_for_version(record.path(), &plaintext, Some(active_version))?;
             let fingerprint = path_fingerprint(record.path());
             let success_event = RotationAuditEvent::new(
                 job_id,
@@ -1225,7 +1239,7 @@ mod tests {
             &self,
             key_id: &KeyId,
             key_version: u64,
-            count: NonZeroU64,
+            config: NonceBudgetConfig,
         ) -> Result<NonceReservation, NonceLedgerError> {
             if self.fail {
                 return Err(NonceLedgerError::Unavailable);
@@ -1238,7 +1252,7 @@ mod tests {
                 .entry((key_id.as_str().to_owned(), key_version))
                 .or_insert(1);
             let end = next
-                .checked_add(count.get())
+                .checked_add(config.reservation_block_size().get())
                 .ok_or(NonceLedgerError::CounterExhausted)?;
             let reservation = NonceReservation::new(*next, end)?;
             *next = end;
@@ -1527,6 +1541,35 @@ mod tests {
     }
 
     #[test]
+    fn concurrent_budget_instances_receive_disjoint_durable_ranges() {
+        let ledger = Arc::new(MemoryLedger::default());
+        let config = NonceBudgetConfig::new(
+            NonZeroU64::new(2).unwrap(),
+            NonZeroU64::new(128).unwrap(),
+        )
+        .unwrap();
+        let key_id = KeyId::new("community/concurrent").unwrap();
+        let mut workers = Vec::new();
+
+        for _ in 0..16 {
+            let ledger = ledger.clone();
+            let key_id = key_id.clone();
+            workers.push(std::thread::spawn(move || {
+                let budget = NonceBudget::new(config, ledger);
+                budget.consume(&key_id, 1).expect("reservation is unique")
+            }));
+        }
+
+        let mut tickets = workers
+            .into_iter()
+            .map(|worker| worker.join().expect("worker completes"))
+            .collect::<Vec<_>>();
+        tickets.sort_unstable();
+        tickets.dedup();
+        assert_eq!(tickets.len(), 16);
+    }
+
+    #[test]
     fn nonce_ledger_failure_fails_closed_before_encryption() {
         let key_id = KeyId::new("community/barrier").unwrap();
         let ledger = Arc::new(MemoryLedger {
@@ -1548,7 +1591,7 @@ mod tests {
     #[test]
     fn nonce_policy_requires_explicit_values_below_the_gcm_invocation_ceiling() {
         assert!(NonceBudgetConfig::new(
-            NonZeroU64::new(0).unwrap_or(NonZeroU64::MIN),
+            NonZeroU64::new(1).unwrap(),
             NonZeroU64::new(1).unwrap()
         )
         .is_ok());
