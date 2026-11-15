@@ -1406,11 +1406,9 @@ mod tests {
         let key = VersionedDataKey::new(1, [0x31; 32]).unwrap();
         let keyring = Arc::new(BarrierKeyring::new(key_id, 1, vec![key]).unwrap());
         let ledger = Arc::new(MemoryLedger::default());
-        let config = NonceBudgetConfig::new(
-            NonZeroU64::new(4).unwrap(),
-            NonZeroU64::new(12).unwrap(),
-        )
-        .unwrap();
+        let config =
+            NonceBudgetConfig::new(NonZeroU64::new(4).unwrap(), NonZeroU64::new(12).unwrap())
+                .unwrap();
         let budget = Arc::new(NonceBudget::new(config, ledger));
         Arc::new(BarrierCipher::new(keyring, budget))
     }
@@ -1487,11 +1485,8 @@ mod tests {
         );
         let other_ledger = Arc::new(MemoryLedger::default());
         let other_budget = Arc::new(NonceBudget::new(
-            NonceBudgetConfig::new(
-                NonZeroU64::new(4).unwrap(),
-                NonZeroU64::new(12).unwrap(),
-            )
-            .unwrap(),
+            NonceBudgetConfig::new(NonZeroU64::new(4).unwrap(), NonZeroU64::new(12).unwrap())
+                .unwrap(),
             other_ledger,
         ));
         let other = BarrierCipher::new(other_keyring, other_budget);
@@ -1523,11 +1518,9 @@ mod tests {
     fn nonce_reservations_are_disjoint_across_budget_instances() {
         let key_id = KeyId::new("community/barrier").unwrap();
         let ledger = Arc::new(MemoryLedger::default());
-        let config = NonceBudgetConfig::new(
-            NonZeroU64::new(2).unwrap(),
-            NonZeroU64::new(6).unwrap(),
-        )
-        .unwrap();
+        let config =
+            NonceBudgetConfig::new(NonZeroU64::new(2).unwrap(), NonZeroU64::new(6).unwrap())
+                .unwrap();
         let first = NonceBudget::new(config, ledger.clone());
         let second = NonceBudget::new(config, ledger);
 
@@ -1537,17 +1530,18 @@ mod tests {
         assert_eq!(second.consume(&key_id, 1), Ok(4));
         assert_eq!(first.consume(&key_id, 1), Ok(5));
         assert_eq!(first.consume(&key_id, 1), Ok(6));
-        assert_eq!(first.consume(&key_id, 1), Err(BarrierError::RotationRequired));
+        assert_eq!(
+            first.consume(&key_id, 1),
+            Err(BarrierError::RotationRequired)
+        );
     }
 
     #[test]
     fn concurrent_budget_instances_receive_disjoint_durable_ranges() {
         let ledger = Arc::new(MemoryLedger::default());
-        let config = NonceBudgetConfig::new(
-            NonZeroU64::new(2).unwrap(),
-            NonZeroU64::new(128).unwrap(),
-        )
-        .unwrap();
+        let config =
+            NonceBudgetConfig::new(NonZeroU64::new(2).unwrap(), NonZeroU64::new(128).unwrap())
+                .unwrap();
         let key_id = KeyId::new("community/concurrent").unwrap();
         let mut workers = Vec::new();
 
@@ -1576,11 +1570,9 @@ mod tests {
             high_water: Mutex::new(HashMap::new()),
             fail: true,
         });
-        let config = NonceBudgetConfig::new(
-            NonZeroU64::new(1).unwrap(),
-            NonZeroU64::new(8).unwrap(),
-        )
-        .unwrap();
+        let config =
+            NonceBudgetConfig::new(NonZeroU64::new(1).unwrap(), NonZeroU64::new(8).unwrap())
+                .unwrap();
         let budget = NonceBudget::new(config, ledger);
         assert_eq!(
             budget.consume(&key_id, 1),
@@ -1590,11 +1582,10 @@ mod tests {
 
     #[test]
     fn nonce_policy_requires_explicit_values_below_the_gcm_invocation_ceiling() {
-        assert!(NonceBudgetConfig::new(
-            NonZeroU64::new(1).unwrap(),
-            NonZeroU64::new(1).unwrap()
-        )
-        .is_ok());
+        assert!(
+            NonceBudgetConfig::new(NonZeroU64::new(1).unwrap(), NonZeroU64::new(1).unwrap())
+                .is_ok()
+        );
         assert_eq!(
             NonceBudgetConfig::new(
                 NonZeroU64::new(1).unwrap(),
@@ -1603,10 +1594,7 @@ mod tests {
             Err(BarrierError::InvalidConfiguration)
         );
         assert_eq!(
-            NonceBudgetConfig::new(
-                NonZeroU64::new(9).unwrap(),
-                NonZeroU64::new(8).unwrap()
-            ),
+            NonceBudgetConfig::new(NonZeroU64::new(9).unwrap(), NonZeroU64::new(8).unwrap()),
             Err(BarrierError::InvalidConfiguration)
         );
     }
@@ -1614,7 +1602,10 @@ mod tests {
     #[test]
     fn old_key_cannot_be_retired_until_inventory_proves_no_dependencies() {
         let cipher = test_cipher();
-        cipher.keyring().install_and_activate(2, [0x77; 32]).unwrap();
+        cipher
+            .keyring()
+            .install_and_activate(2, [0x77; 32])
+            .unwrap();
         let key_id = cipher.keyring().key_id().clone();
         let dependent = MemoryInventory {
             has_dependencies: true,

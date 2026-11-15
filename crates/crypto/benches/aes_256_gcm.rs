@@ -1,8 +1,8 @@
 use std::hint::black_box;
 
 use criterion::{BenchmarkId, Criterion, Throughput, criterion_group, criterion_main};
-use ferrum_crypto::barrier::{BarrierAad, CanonicalPath};
 use ferrum_crypto::Aes256GcmProvider;
+use ferrum_crypto::barrier::{BarrierAad, CanonicalPath};
 
 fn bench_aes_256_gcm(c: &mut Criterion) {
     let key = [0x5A_u8; 32];
@@ -41,7 +41,9 @@ fn bench_aes_256_gcm(c: &mut Criterion) {
     for size in [16_usize, 64, 256, 1_024] {
         let path = CanonicalPath::new(vec![b'p'; size]).expect("valid canonical path");
         aad_group.bench_with_input(BenchmarkId::new("encode", size), &path, |b, path| {
-            b.iter(|| black_box(BarrierAad::new(black_box(path), black_box(1)).expect("AAD encodes")));
+            b.iter(|| {
+                black_box(BarrierAad::new(black_box(path), black_box(1)).expect("AAD encodes"))
+            });
         });
     }
     aad_group.finish();
