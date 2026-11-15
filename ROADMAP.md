@@ -79,7 +79,7 @@ Implement AES-256-GCM through the approved AWS-LC provider with the exact fixed-
 
 The nonce-use ledger must atomically persist a per-key-version high-water reservation before encryption. A possibly partially consumed reservation is spent after failure/restart. The rotation worker performs bounded stable-page reads, authenticated decrypt/re-encrypt, CAS updates with matching audit events, and durable checkpoints with audit. Old DEKs cannot be retired until an inventory proves no live records, backups, snapshots or in-progress jobs depend on them.
 
-**Definition of Done:** tamper, wrong-path, wrong-version, AAD, nonce, rollover, interruption, CAS-conflict and old-key-retention tests pass; proptest and fuzz cover the FBE1 parser, AAD encoder, nonce reservation state and rotation checkpoints. CI runs bounded fuzz smoke campaigns; scheduled CI runs extended campaigns. A persistent backend must prove reservations/checkpoints/CAS/audit atomicity and restart safety.
+**Definition of Done:** tamper, wrong-path, wrong-version, AAD, nonce, rollover, interruption, CAS-conflict retry/replay and old-key-retention tests pass; proptest and fuzz cover the FBE1 parser, AAD encoder, nonce reservation state and rotation checkpoints. CI runs bounded fuzz smoke campaigns; scheduled CI runs extended campaigns. A persistent backend must prove reservations/checkpoints/CAS/audit atomicity and restart safety.
 
 **Explicitly pending owner parameters:** exact numeric AES-GCM rotation threshold and quantitative safety margin; exact nonce-reservation block size. The API has no defaults and requires explicit values. The hard less-than-2^32 ceiling is only an upper bound, not a selected operational threshold. Do not infer either value.
 
