@@ -1722,7 +1722,7 @@ mod tests {
             cipher.open(&path, &stored.1).unwrap(),
             b"concurrent writer value"
         );
-        assert_ne!(stored.1, concurrent);
+        assert_eq!(stored.1, concurrent);
     }
 
     #[test]
