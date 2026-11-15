@@ -685,10 +685,7 @@ impl BarrierKeyring {
             return Err(BarrierError::KeyStillReferenced);
         }
 
-        let mut state = self
-            .state
-            .write()
-            .map_err(|_| BarrierError::LockPoisoned)?;
+        let mut state = self.state.write().map_err(|_| BarrierError::LockPoisoned)?;
         if version == state.active_version {
             return Err(BarrierError::ActiveKeyCannotBeRetired);
         }
@@ -1675,7 +1672,11 @@ mod tests {
         store.insert(path, encoded);
         let engine = RotationEngine::new(cipher);
         assert_eq!(
-            engine.run_page(&store, "rotation-corrupt-active", NonZeroUsize::new(1).unwrap()),
+            engine.run_page(
+                &store,
+                "rotation-corrupt-active",
+                NonZeroUsize::new(1).unwrap()
+            ),
             Err(BarrierError::Provider(CryptoError::AuthenticationFailed))
         );
     }
@@ -1710,8 +1711,8 @@ mod tests {
             ).unwrap();
             let encoded = envelope.encode();
             let decoded = BarrierEnvelope::decode(&encoded).unwrap();
-            prop_assert_eq!(decoded, envelope);
             prop_assert_eq!(decoded.encode(), encoded);
+            prop_assert_eq!(decoded, envelope);
         }
     }
 }
