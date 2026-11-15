@@ -516,15 +516,15 @@ impl NonceBudget {
             .map_err(|_| BarrierError::LockPoisoned)?;
         let map_key = (key_id.clone(), key_version);
 
-        if let Some(cursor) = cursors.get_mut(&map_key) {
-            if cursor.next < cursor.end_exclusive {
-                if cursor.next > self.config.rotation_threshold.get() {
-                    return Err(BarrierError::RotationRequired);
-                }
-                let ticket = cursor.next;
-                cursor.next += 1;
-                return Ok(ticket);
+        if let Some(cursor) = cursors.get_mut(&map_key)
+            && cursor.next < cursor.end_exclusive
+        {
+            if cursor.next > self.config.rotation_threshold.get() {
+                return Err(BarrierError::RotationRequired);
             }
+            let ticket = cursor.next;
+            cursor.next += 1;
+            return Ok(ticket);
         }
 
         let reservation = self.ledger.reserve(key_id, key_version, self.config)?;
@@ -1341,7 +1341,7 @@ mod tests {
             let mut remaining = state
                 .records
                 .iter()
-                .filter(|(path, _)| after.map_or(true, |cursor| path.as_slice() > cursor));
+                .filter(|(path, _)| after.is_none_or(|cursor| path.as_slice() > cursor));
             let mut records = Vec::new();
             for _ in 0..limit.get() {
                 let Some((path, envelope)) = remaining.next() else {
