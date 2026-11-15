@@ -2,10 +2,10 @@
 
 //! Cryptographic provider boundary for Ferrum Community.
 //!
-//! Phase 1.1 selects AWS-LC through aws-lc-rs and provides a narrow AES-256-GCM
-//! adapter. The key hierarchy, canonical AAD encoder, durable nonce budget and
-//! automatic key rotation are intentionally implemented in later Phase 1
-//! subphases. This adapter must not be presented as the complete barrier.
+//! AWS-LC provides the AES-256-GCM primitive. Phase 1.6 adds the versioned
+//! storage barrier, canonical ADR-0004 AAD, durable nonce-ledger contract and
+//! resumable re-encryption orchestration. Concrete durable storage adapters
+//! are implemented by Phase 1.7; this crate alone is not a production service.
 
 use std::fmt;
 
@@ -13,6 +13,7 @@ use aws_lc_rs::aead::{AES_256_GCM, Aad, NONCE_LEN, Nonce, RandomizedNonceKey};
 use zeroize::Zeroizing;
 
 /// Asynchronous key-management provider contract.
+pub mod barrier;
 pub mod kmp;
 
 /// Exact cryptographic provider selected by the owner-approved ADR-0013.

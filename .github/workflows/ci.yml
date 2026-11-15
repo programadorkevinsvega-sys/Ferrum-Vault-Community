@@ -97,6 +97,9 @@ jobs:
           - seal_bootstrap_transitions
           - root_quorum_authorization
           - shamir_unsealer
+          - barrier_envelope_decode
+          - barrier_aad_invariants
+          - barrier_nonce_rotation
     steps:
       - name: Check out repository
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
@@ -165,6 +168,8 @@ jobs:
         run: cargo +nightly-2026-11-12 miri setup
       - name: Run pure-Rust KMP parser tests under Miri
         run: cargo +nightly-2026-11-12 miri test --locked -p ferrum-crypto --lib kmp::tests
+      - name: Run canonical barrier AAD encoder under Miri
+        run: cargo +nightly-2026-11-12 miri test --locked -p ferrum-crypto --lib barrier::tests::aad_matches_adr_0004_golden_encoding
 
   kms-adapter:
     name: Optional AWS SDK adapter and in-memory fake tests

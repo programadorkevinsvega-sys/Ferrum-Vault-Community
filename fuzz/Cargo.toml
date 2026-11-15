@@ -88,3 +88,24 @@ path = "fuzz_targets/shamir_unsealer.rs"
 test = false
 doc = false
 bench = false
+
+[[bin]]
+name = "barrier_envelope_decode"
+path = "fuzz_targets/barrier_envelope_decode.rs"
+test = false
+doc = false
+bench = false
+
+[[bin]]
+name = "barrier_aad_invariants"
+path = "fuzz_targets/barrier_aad_invariants.rs"
+test = false
+doc = false
+bench = false
+
+[[bin]]
+name = "barrier_nonce_rotation"
+path = "fuzz_targets/barrier_nonce_rotation.rs"
+test = false
+doc = false
+bench = false
