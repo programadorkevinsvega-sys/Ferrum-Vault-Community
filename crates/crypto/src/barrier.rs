@@ -11,7 +11,7 @@ use std::fmt;
 use std::num::{NonZeroU64, NonZeroUsize};
 use std::sync::{Arc, Mutex, RwLock};
 
-use aws_lc_rs::digest::{digest, SHA256};
+use aws_lc_rs::digest::{SHA256, digest};
 use zeroize::Zeroizing;
 
 use crate::kmp::KeyId;
@@ -65,7 +65,9 @@ impl fmt::Display for BarrierError {
             Self::ActiveKeyCannotBeRetired => "active barrier key cannot be retired",
             Self::KeyStillReferenced => "barrier key still has retained dependencies",
             Self::NonceLedgerUnavailable => "durable nonce ledger unavailable",
-            Self::NonceLedgerInvalidReservation => "durable nonce ledger returned an invalid reservation",
+            Self::NonceLedgerInvalidReservation => {
+                "durable nonce ledger returned an invalid reservation"
+            }
             Self::NonceBudgetExhausted => "barrier nonce-use budget exhausted",
             Self::RotationRequired => "barrier key rotation required before another encryption",
             Self::ActiveKeyVersionChanged => "active key version changed during re-encryption",
@@ -156,8 +158,13 @@ impl BarrierAad {
         let format_version = BARRIER_FORMAT_VERSION.to_be_bytes();
         let key_version = key_version.to_be_bytes();
         let mut encoded = Vec::with_capacity(
-            4 + COMMUNITY_TENANT_ID.len() + 4 + format_version.len()
-                + 4 + key_version.len() + 4 + path.as_bytes().len(),
+            4 + COMMUNITY_TENANT_ID.len()
+                + 4
+                + format_version.len()
+                + 4
+                + key_version.len()
+                + 4
+                + path.as_bytes().len(),
         );
         append_length_prefixed(&mut encoded, COMMUNITY_TENANT_ID)?;
         append_length_prefixed(&mut encoded, &format_version)?;
@@ -236,9 +243,8 @@ impl BarrierEnvelope {
     pub fn encode(&self) -> Vec<u8> {
         let key_id = self.key_id.as_str().as_bytes();
         let ciphertext = &self.payload.ciphertext_and_tag;
-        let mut encoded = Vec::with_capacity(
-            4 + 2 + 2 + key_id.len() + 8 + GCM_NONCE_LEN + 4 + ciphertext.len(),
-        );
+        let mut encoded =
+            Vec::with_capacity(4 + 2 + 2 + key_id.len() + 8 + GCM_NONCE_LEN + 4 + ciphertext.len());
         encoded.extend_from_slice(ENVELOPE_MAGIC);
         encoded.extend_from_slice(&self.format_version.to_be_bytes());
         encoded.extend_from_slice(&(key_id.len() as u16).to_be_bytes());
@@ -310,7 +316,10 @@ impl fmt::Debug for BarrierEnvelope {
             .field("key_id", &self.key_id)
             .field("key_version", &self.key_version)
             .field("nonce", &"[REDACTED]")
-            .field("ciphertext_and_tag_len", &self.payload.ciphertext_and_tag.len())
+            .field(
+                "ciphertext_and_tag_len",
+                &self.payload.ciphertext_and_tag.len(),
+            )
             .finish()
     }
 }
@@ -478,7 +487,10 @@ impl fmt::Debug for NonceBudget {
     fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
         formatter
             .debug_struct("NonceBudget")
-            .field("reservation_block_size", &self.config.reservation_block_size)
+            .field(
+                "reservation_block_size",
+                &self.config.reservation_block_size,
+            )
             .field("rotation_threshold", &self.config.rotation_threshold)
             .finish()
     }
@@ -515,11 +527,7 @@ impl NonceBudget {
             }
         }
 
-        let reservation = self.ledger.reserve(
-            key_id,
-            key_version,
-            self.config,
-        )?;
+        let reservation = self.ledger.reserve(key_id, key_version, self.config)?;
         let reserved_count = reservation
             .end_exclusive
             .checked_sub(reservation.start)
@@ -645,10 +653,7 @@ impl BarrierKeyring {
         key_bytes: [u8; 32],
     ) -> Result<(), BarrierError> {
         let key = VersionedDataKey::new(version, key_bytes)?;
-        let mut state = self
-            .state
-            .write()
-            .map_err(|_| BarrierError::LockPoisoned)?;
+        let mut state = self.state.write().map_err(|_| BarrierError::LockPoisoned)?;
         let highest = state.keys.keys().next_back().copied().unwrap_or(0);
         if version <= highest || state.keys.contains_key(&version) {
             return Err(BarrierError::InvalidKeyVersion);
@@ -667,10 +672,7 @@ impl BarrierKeyring {
         inventory: &dyn KeyDependencyInventory,
     ) -> Result<(), BarrierError> {
         {
-            let state = self
-                .state
-                .read()
-                .map_err(|_| BarrierError::LockPoisoned)?;
+            let state = self.state.read().map_err(|_| BarrierError::LockPoisoned)?;
             if version == state.active_version {
                 return Err(BarrierError::ActiveKeyCannotBeRetired);
             }
@@ -690,7 +692,10 @@ impl BarrierKeyring {
         if version == state.active_version {
             return Err(BarrierError::ActiveKeyCannotBeRetired);
         }
-        state.keys.remove(&version).ok_or(BarrierError::KeyNotFound)?;
+        state
+            .keys
+            .remove(&version)
+            .ok_or(BarrierError::KeyNotFound)?;
         Ok(())
     }
 }
@@ -716,11 +721,8 @@ impl std::error::Error for KeyInventoryError {}
 /// persisted rotation checkpoints, and must serialize the check against
 /// restore/retention changes. A partial inventory is not proof of absence.
 pub trait KeyDependencyInventory: Send + Sync {
-    fn has_dependencies(
-        &self,
-        key_id: &KeyId,
-        key_version: u64,
-    ) -> Result<bool, KeyInventoryError>;
+    fn has_dependencies(&self, key_id: &KeyId, key_version: u64)
+    -> Result<bool, KeyInventoryError>;
 }
 
 /// AES-256-GCM barrier for one key id and key-version registry.
@@ -752,11 +754,7 @@ impl BarrierCipher {
 
     /// Encrypts with the active DEK. A durable nonce-use reservation is
     /// obtained before AWS-LC is allowed to create a random 96-bit nonce.
-    pub fn seal(
-        &self,
-        path: &CanonicalPath,
-        plaintext: &[u8],
-    ) -> Result<Vec<u8>, BarrierError> {
+    pub fn seal(&self, path: &CanonicalPath, plaintext: &[u8]) -> Result<Vec<u8>, BarrierError> {
         self.seal_for_version(path, plaintext, None)
     }
 
@@ -1034,10 +1032,7 @@ fn validate_job_id(job_id: &str) -> Result<(), BarrierError> {
 /// commit atomically. Replaying a page after a crash is safe: already migrated
 /// rows carry the target version and are skipped.
 pub trait RotationStore: Send + Sync {
-    fn checkpoint(
-        &self,
-        job_id: &str,
-    ) -> Result<Option<RotationCheckpoint>, RotationStoreError>;
+    fn checkpoint(&self, job_id: &str) -> Result<Option<RotationCheckpoint>, RotationStoreError>;
 
     fn list_page(
         &self,
@@ -1093,8 +1088,7 @@ impl RotationEngine {
         let checkpoint = match store.checkpoint(job_id)? {
             Some(checkpoint) => checkpoint,
             None => {
-                let checkpoint =
-                    RotationCheckpoint::new(active_version, None, false)?;
+                let checkpoint = RotationCheckpoint::new(active_version, None, false)?;
                 let event = RotationAuditEvent::new(
                     job_id,
                     self.barrier.keyring.key_id(),
@@ -1144,14 +1138,17 @@ impl RotationEngine {
             if envelope.key_version > active_version {
                 return Err(BarrierError::FutureKeyVersion);
             }
+            // Authenticate every row, including those already on the target
+            // version. A corrupt active-version envelope must not be counted
+            // as successfully migrated merely because it needs no rewrite.
+            let plaintext = Zeroizing::new(self.barrier.open(record.path(), record.envelope())?);
             if envelope.key_version == active_version {
                 continue;
             }
 
-            let plaintext = Zeroizing::new(
-                self.barrier.open(record.path(), record.envelope())?,
-            );
-            let replacement = self.barrier.seal_for_version(record.path(), &plaintext, Some(active_version))?;
+            let replacement =
+                self.barrier
+                    .seal_for_version(record.path(), &plaintext, Some(active_version))?;
             let fingerprint = path_fingerprint(record.path());
             let success_event = RotationAuditEvent::new(
                 job_id,
@@ -1189,8 +1186,7 @@ impl RotationEngine {
         } else {
             page.next_cursor().map(ToOwned::to_owned)
         };
-        let next_checkpoint =
-            RotationCheckpoint::new(active_version, next_cursor, complete)?;
+        let next_checkpoint = RotationCheckpoint::new(active_version, next_cursor, complete)?;
         let event_kind = if complete {
             RotationAuditKind::Completed
         } else {
@@ -1333,9 +1329,10 @@ mod tests {
                 .state
                 .lock()
                 .map_err(|_| RotationStoreError::Unavailable)?;
-            let mut remaining = state.records.iter().filter(|(path, _)| {
-                after.map_or(true, |cursor| path.as_slice() > cursor)
-            });
+            let mut remaining = state
+                .records
+                .iter()
+                .filter(|(path, _)| after.map_or(true, |cursor| path.as_slice() > cursor));
             let mut records = Vec::new();
             for _ in 0..limit.get() {
                 let Some((path, envelope)) = remaining.next() else {
@@ -1664,6 +1661,23 @@ mod tests {
             assert!(plaintext == b"alpha" || plaintext == b"beta");
         }
         assert!(store.audit_count() >= 5);
+    }
+
+    #[test]
+    fn rotation_rejects_corrupt_envelopes_even_when_their_version_is_active() {
+        let cipher = test_cipher();
+        let path = CanonicalPath::new(b"kv/corrupt-active".to_vec()).unwrap();
+        let mut encoded = cipher.seal(&path, b"synthetic data").unwrap();
+        let last = encoded.last_mut().expect("GCM tag is present");
+        *last ^= 0x01;
+
+        let store = MemoryRotationStore::default();
+        store.insert(path, encoded);
+        let engine = RotationEngine::new(cipher);
+        assert_eq!(
+            engine.run_page(&store, "rotation-corrupt-active", NonZeroUsize::new(1).unwrap()),
+            Err(BarrierError::Provider(CryptoError::AuthenticationFailed))
+        );
     }
 
     proptest! {
