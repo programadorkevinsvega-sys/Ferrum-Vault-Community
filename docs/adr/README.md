@@ -1,6 +1,6 @@
 # Community Architecture Decision Records
 
-This directory contains the public, Community-scoped adaptations of the owner's approved Ferrum architecture decisions. They preserve the source decision identifiers and status while omitting private-edition implementation details and owner-only repository administration.
+This directory contains the public, Community-scoped adaptations of owner-approved Ferrum architecture decisions (ADRs 0001–0025) and the separately identified delegated technical selections for Phase 2 (ADRs 0026–0029). Source decision identifiers/statuses and delegated provenance are preserved while private-edition implementation details and owner-only repository administration are omitted.
 
 See the [source ADR classification and carryover matrix](SOURCE-MAP.md) for the per-decision edition/scope classification and the reason each original ADR was published, adapted or withheld.
 
@@ -12,7 +12,7 @@ See the [source ADR classification and carryover matrix](SOURCE-MAP.md) for the 
 - **Delegated technical selection:** detailed Community implementation defaults selected under explicit owner delegation; not retroactively attributed to the original source baseline and subject to the applicable phase-acceptance gate.
 - **Superseded:** replaced by a later public ADR.
 
-These records describe approved design, not implemented or independently verified behavior.
+These records describe owner-approved requirements or delegated technical selections, as labelled; they do not by themselves prove runtime implementation or independent verification.
 
 ## Provenance
 
