@@ -182,7 +182,9 @@ jobs:
         with:
           persist-credentials: false
       - name: Install pinned Rust toolchain
-        run: rustup toolchain install 1.100.0 --profile minimal --component rustfmt
+        run: |
+          rustup toolchain install 1.100.0 --profile minimal
+          rustup component add rustfmt --toolchain 1.100.0
       - name: Test KMS adapter with in-memory fake only
         run: cargo +1.100.0 test --locked -p ferrum-seal --features aws-kms
       - name: Compile official AWS SDK live example without credentials
