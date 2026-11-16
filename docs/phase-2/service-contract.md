@@ -67,7 +67,7 @@ The exact route and RPC names below are binding for Phase 2.1. The security pipe
 | Readiness | `GET /v1/sys/health/ready` | `SystemService.GetReadiness` | Public, IP-limited | Yes | No |
 | Seal status | `GET /v1/sys/seal-status` | `SystemService.GetSealStatus` | Public, IP-limited | Yes | No |
 | Consume bootstrap | `POST /v1/sys/bootstrap/consume` | `SystemService.ConsumeBootstrapToken` | One-time bootstrap token | Only while uninitialized | Required intent/outcome |
-| Complete bootstrap | `POST /v1/sys/bootstrap/complete` | `SystemService.CompleteBootstrap` | One-time restricted setup token (`fvst_`) | Only while uninitialized and unsealed? no; requires unsealed | Required intent/outcome |
+| Complete bootstrap | `POST /v1/sys/bootstrap/complete` | `SystemService.CompleteBootstrap` | One-time restricted setup token (`fvst_`) | Only while uninitialized; service must be unsealed | Required intent/outcome |
 | Start unseal session | `POST /v1/sys/unseal/sessions` | `SystemService.CreateUnsealSession` | No bearer token; Shamir ceremony gate | Yes | Attempt/result metadata only |
 | Submit unseal share | `POST /v1/sys/unseal/sessions/{sessionId}/shares` | `SystemService.SubmitUnsealShare` | One valid FRS1 share per distinct participant | Yes | Attempt/result metadata only |
 | Seal | `POST /v1/sys/seal` | `SystemService.Seal` | Authenticated; `sys/seal:execute` | No | Required intent/outcome |
@@ -115,7 +115,7 @@ The OpenAPI and protobuf artifacts are the authoritative field-level schemas. Th
 
 HTTP errors use RFC 9457 Problem Details with `Content-Type: application/problem+json` and stable extension fields `code`, `requestId` and `retryable`. Never return stack traces, file paths, SQL/DB details, credential validity distinctions or secret-bearing diagnostics.
 
-The gRPC adapter maps the same domain error to canonical gRPC status codes and a `google.rpc.Status` detail carrying the same stable `code` and request ID. The HTTP and gRPC codes must be semantically equivalent.
+The gRPC adapter maps the same domain error to canonical gRPC status codes and a `google.rpc.Status` detail carrying the same stable `code` and request ID. The HTTP and gRPC codes must be semantically equivalent. HTTP headers and gRPC metadata carry identical bearer credential and idempotency-key semantics.
 
 | Domain error | HTTP | gRPC |
 |---|---:|---|
@@ -172,7 +172,7 @@ All password and AppRole login failures use the same public error class and mess
 
 - The initial bootstrap token is generated out-of-band by the local CLI, uses the `fvbt_` prefix followed by 32 random bytes encoded as unpadded base64url, is stored only as `SHA-256(ASCII("FerrumVaultCommunityBootstrapV1") || 0x00 || token_random_32_bytes)` and expires after 5 minutes. It may be consumed once, only while the service is uninitialized. Its response is one-time; a lost response requires the local operator to restart the bootstrap procedure through the local CLI while the service remains uninitialized, not an unauthenticated API replay.
 - Consuming it issues a distinct one-time setup credential: `fvst_` plus 32 random bytes encoded as unpadded base64url, stored only as `SHA-256(ASCII("FerrumVaultCommunitySetupV1") || 0x00 || setup_random_32_bytes)`, valid for 15 minutes. This token is not a general bearer token and is accepted only by `POST /v1/sys/bootstrap/complete`.
-- `CompleteBootstrap` is available only after the service is unsealed but before it is initialized. In one atomic storage/outbox operation it creates exactly one first password identity, creates exactly one caller-supplied initial ACL policy, assigns that policy to the identity, marks the service initialized and revokes the setup credential. The request body contains the username, password, policy name and full version-1 ACL document. It cannot create general tokens, read protected data or perform root operations. The returned response contains only non-secret identity/policy metadata; the caller must authenticate normally using the newly created password identity.
+- `CompleteBootstrap` is available only after the service is unsealed but before it is initialized. In one atomic storage/outbox operation it creates exactly one first password identity, creates exactly one caller-supplied version-1 ACL policy named `bootstrap-admin`, assigns that policy to the identity, marks the service initialized and revokes the setup credential. The request body contains the username, password, fixed policy name and full version-1 ACL document. The policy must enumerate only Phase 2 administrative resources, may not use a catch-all resource wildcard, and may not grant future PKI/KV/Transit/HA capabilities. It cannot create general tokens, read protected data or perform root operations. The returned response contains only non-secret identity/policy metadata; the caller must authenticate normally using the newly created password identity.
 - If the setup credential expires or its response is lost, the operator must use the local CLI to rotate/reissue the bootstrap capability while the instance is still uninitialized; there is no unauthenticated API replay path. A successful bootstrap is irreversible through the public API.
 - All principal IDs, tenant values, roles and credential metadata are resolved by the server. No client identity or tenant field is authoritative.
 
