@@ -4,7 +4,7 @@ The Community storage crate implements ADR-0003 using redb as the initial durabl
 
 ## Contract
 
-`KvBackend` exposes versioned `get`, `put`, `delete`, prefix `list` with opaque cursors, compare-and-swap and atomic mutation batches guarded by expected-version or absence preconditions. Limits and malformed cursors are reported through typed errors.
+`KvBackend` exposes versioned `get`, `put`, `delete`, prefix `list` with opaque cursors, compare-and-swap and atomic mutation batches guarded by expected-version or absence preconditions. Limits and malformed cursors are reported through typed errors. Deletes retain an internal versioned tombstone: reads and pagination treat the key as absent, while a later recreation increments its version instead of resetting it and reopening an ABA window.
 
 `RedbStore` opens the database in `MultiWriter` mode and explicitly requests `Durability::Immediate` for every write transaction. The same database implements the Phase 1.6 `NonceUsageLedger`, `RotationStore` and `KeyDependencyInventory` contracts.
 
