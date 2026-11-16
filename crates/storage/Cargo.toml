@@ -1,0 +1,16 @@
+[package]
+name = "ferrum-storage"
+version = "0.1.0"
+description = "Durable Community storage contracts and redb backend"
+edition.workspace = true
+license.workspace = true
+rust-version.workspace = true
+repository.workspace = true
+publish = false
+
+[dependencies]
+ferrum-crypto = { path = "../crypto" }
+redb.workspace = true
+
+[dev-dependencies]
+proptest.workspace = true
