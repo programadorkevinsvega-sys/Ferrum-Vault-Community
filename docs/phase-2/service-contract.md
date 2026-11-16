@@ -54,7 +54,7 @@ Community remains a single logical tenant named `root`. Tenant identity is injec
 - Generate a cryptographically random server request ID for every request. Return it as `X-Request-ID` for HTTP and `x-request-id` response metadata for gRPC. Never use a caller-supplied request ID as authority.
 - Use one request deadline across decode, authentication, authorization, handler, audit and response. Default deadline is 15 seconds; hard maximum is 30 seconds. Cancellation is propagated to extension points as required by ADR-0002.
 - State-changing operations require an `Idempotency-Key`: 16 random bytes encoded as unpadded base64url (22 characters). Its scope is principal + canonical operation + key; retention is 24 hours.
-- The server stores a digest of the canonical request, never the raw key. A repeat with the same key and same request returns the original operation result/reference. Reuse with a different request returns HTTP 409 / gRPC ALREADY_EXISTS. Credentials, unseal shares and secret-bearing responses are never replay-cached.
+- The server stores a digest of the canonical request, never the raw key. A repeat with the same key and same request returns the original operation result/reference. Reuse with a different request returns HTTP 409 / gRPC ALREADY_EXISTS. Credentials, unseal/root shares and secret-bearing responses are never replay-cached.
 - The idempotency record and state transition must be atomic when the backend supports it. Otherwise use the durable outbox/reconciliation contract in Section 11.
 
 ## 4. Canonical operation catalog
@@ -92,9 +92,11 @@ The exact route and RPC names below are binding for Phase 2.1. The security pipe
 | Create/update ACL policy | `PUT /v1/sys/policies/acl/{name}` | `PolicyService.PutPolicy` | `sys/policy:manage` | No | Required intent/outcome |
 | Delete ACL policy | `DELETE /v1/sys/policies/acl/{name}` | `PolicyService.DeletePolicy` | `sys/policy:manage` | No | Required intent/outcome |
 | Begin root operation | `POST /v1/sys/root-operations` | `RootService.BeginOperation` | Authenticated; `sys/root:execute` | No | Required intent/outcome |
-| Approve root operation | `POST /v1/sys/root-operations/{operationId}/approvals` | `RootService.ApproveOperation` | Authenticated; distinct valid 2-of-3 root share | No | Required intent/outcome |
+| Approve root operation | `POST /v1/sys/root-operations/{operationId}/approvals` | `RootService.ApproveOperation` | Authenticated; unique principal and distinct valid root-share participant | No | Required intent/outcome |
 | Read root-operation status | `GET /v1/sys/root-operations/{operationId}` | `RootService.GetOperation` | `sys/root:read` | No | Security event |
 | Audit status | `GET /v1/sys/audit/status` | `AuditService.GetStatus` | `sys/audit:read` | No | Security event |
+
+Only one root-operation session may be active globally. Each approval must come from a different authenticated principal and a distinct FRS1 participant ID. The server verifies the same configured 2-of-3 ceremony and operation binding, records only a domain-separated participant fingerprint for replay prevention, and zeroizes share bytes immediately. The response exposes only operation state and the fixed threshold, never the number of approvals or participant identity. A duplicate principal, duplicate participant, wrong ceremony or expired operation is rejected. Root-operation shares never enter durable storage, audit payloads, logs, metrics or traces.
 
 The OpenAPI and protobuf artifacts are the authoritative field-level schemas. The operation catalog intentionally excludes all KV, PKI, Transit and HA routes until their own roadmap phases.
 
@@ -102,7 +104,7 @@ The OpenAPI and protobuf artifacts are the authoritative field-level schemas. Th
 
 ### 5.1 Success
 
-- Successful resource responses use a typed `data` object. Authentication responses use an `auth` object. Empty success uses HTTP 204 / gRPC OK with no body.
+- Successful resource responses use operation-specific typed schemas, as defined in OpenAPI/proto3. Authentication responses use an `auth` object. Empty success uses HTTP 204 / gRPC OK with no body.
 - Every response carries the server-generated request ID in its transport metadata/header.
 - Resource revisions are opaque ETags. Policy updates require `If-Match`; missing precondition returns 428, stale revision returns 412. The gRPC equivalent carries an expected revision and returns FAILED_PRECONDITION on mismatch.
 - List operations use an opaque, integrity-protected cursor bound to principal, query and page size. Default page size 50; maximum 100; cursor lifetime 5 minutes.
@@ -134,7 +136,7 @@ All password and AppRole login failures use the same public error class and mess
 
 ### 6.1 Opaque API tokens
 
-- Token format: `fvct_` followed by 32 CSPRNG bytes encoded as unpadded base64url. The secret is returned exactly once.
+- Token format: `fvct_` followed by 32 CSPRNG bytes encoded as unpadded base64url (43 encoded characters). The secret is returned exactly once.
 - Tokens are opaque random bearer credentials, not self-contained JWTs. The server stores a SHA-256 digest with domain separation, plus encrypted metadata. Plaintext tokens never enter storage, logs, audit, metrics, traces or test artifacts.
 - An accessor is a random 128-bit non-secret handle. It is not accepted for authentication and cannot reveal a token.
 - Default access-token TTL: 15 minutes. Standard maximum TTL: 8 hours. Privileged/root-administration token TTL: 5 minutes, absolute maximum 15 minutes, non-renewable.
@@ -152,7 +154,7 @@ All password and AppRole login failures use the same public error class and mess
 
 ### 6.3 AppRole
 
-- `role_id` is a random 128-bit public identifier. `secret_id` is a random 256-bit secret shown once; only its SHA-256 digest is stored.
+- `role_id` is a random 128-bit public identifier encoded as unpadded base64url. `secret_id` is the `fvsa_` prefix followed by a random 256-bit secret encoded as unpadded base64url, shown once; only its SHA-256 digest is stored.
 - Default Secret ID TTL is 24 hours, maximum 30 days, and default use count is one. A role may explicitly configure at most 10 uses; unlimited-use Secret IDs are forbidden.
 - Role token TTL defaults to 15 minutes and is capped at 1 hour. Policies issued by a role are fixed at role configuration and cannot be expanded by login input.
 - Optional CIDR binding is checked against the trusted peer address, never a client-supplied forwarding header. Secret ID expiry/use decrement is atomic and replay-safe.
@@ -166,7 +168,7 @@ All password and AppRole login failures use the same public error class and mess
 
 ### 6.5 Bootstrap and identity ownership
 
-- The initial bootstrap token is generated out-of-band by the local CLI, contains 32 random bytes, is stored only as a digest and expires after 5 minutes. It may be consumed once, only while the service is uninitialized.
+- The initial bootstrap token is generated out-of-band by the local CLI, uses the `fvbt_` prefix followed by 32 random bytes encoded as unpadded base64url, is stored only as a digest and expires after 5 minutes. It may be consumed once, only while the service is uninitialized.
 - Consuming it issues a one-time bootstrap administration token limited to creating the first password identity and initial ACL policy. It cannot read protected data, create general tokens or perform root operations. It expires after 5 minutes and is revoked automatically when initial setup completes.
 - All principal IDs, tenant values, roles and credential metadata are resolved by the server. No client identity or tenant field is authoritative.
 
@@ -227,7 +229,7 @@ No token login, AppRole login, password login, token lookup, policy API, audit c
 
 Health responses expose only the minimum needed by probes. Seal status contains `initialized`, `sealed` and the configured threshold; it never contains participant IDs, submitted-share count, share bytes, root identifiers, storage paths, key metadata or detailed failure causes.
 
-Unseal uses one active in-memory session with a five-minute TTL. Each submission contains exactly one FRS1 share. The server verifies it belongs to the current ceremony and accepts only distinct participant IDs. On the second distinct valid share the existing Shamir 2-of-3 Unsealer is invoked. Shares are held only in zeroizing memory; they are never written to disk, audit, logs, metrics or traces. Sessions and shares are erased on success, invalidation, timeout, cancellation or process restart. Restart leaves the service sealed. No KMS fallback is attempted; optional AWS KMS selection remains explicit under ADR-0024.
+Unseal uses one active in-memory session with a five-minute TTL. Each submission contains exactly one FRS1 share. The server verifies it belongs to the current ceremony and accepts only distinct participant IDs. On the second distinct valid share the existing Shamir 2-of-3 Unsealer is invoked. Share bytes are held only in zeroizing memory and erased immediately after validation/combination; they are never written to disk, audit, logs, metrics or traces. The response never reveals how many shares have been submitted or participant identifiers. Sessions and shares are erased on success, invalidation, timeout, cancellation or process restart. Restart leaves the service sealed. No KMS fallback is attempted; optional AWS KMS selection remains explicit under ADR-0024.
 
 ## 9. Request and resource limits
 
@@ -261,7 +263,7 @@ Rate-limit defaults:
 - Password/AppRole login: 10 attempts/minute per source IP and 5 attempts/minute per normalized user/role identifier. Use progressive delay; do not permanently lock an account based solely on remote failures.
 - Unseal share submissions: 5 attempts per 15 minutes per source IP; invalid shares count.
 - Authenticated identity: 600 requests/minute, burst 120; administrative mutation: 60/minute, burst 10.
-- Root-operation approvals: 10 attempts/hour per principal, additionally limited by the two-of-three ceremony state.
+- Root-operation approvals: 10 attempts/hour per principal, additionally limited by the two-of-three ceremony state. Only one root mutation may be active at a time.
 - Global overload or bounded-queue exhaustion returns 429 or 503. Rate limiting is never silently disabled when its state backend is unavailable.
 
 Community Phase 2 is one service instance. Rate-limit state and lockout counters are persisted using the accepted redb boundary where persistence is required; in-memory token buckets are only an additional fast front gate. Future multi-instance execution must provide a shared atomic rate-limit backend before it may claim cluster-wide enforcement.
@@ -283,7 +285,7 @@ The default source address is the actual socket peer. `Forwarded` is trusted onl
 
 An audit event contains only an allowlisted set of fields:
 
-- `schemaVersion`, `eventId`, `sequence`, `occurredAt` (UTC RFC 3339), `eventType` (`intent`, `outcome`, `auth`, `security`), `operationId`, `requestId`, `transport`, `principalId` (or a non-reversible anonymous marker), `authMethod`, `tenantId=root`, `operation`, `resource`, `action`, `decision`, `outcome`, `reasonCode`, `sourceAddress`, `durationMs`, `policyRevision` and `previousHash`.
+- `schemaVersion`, `eventId`, `sequence` (base-10 string to avoid JSON integer precision loss), `occurredAt` (UTC RFC 3339), `eventType` (`intent`, `outcome`, `auth`, `security`), `operationId`, `requestId`, `transport`, `principalId` (or a non-reversible anonymous marker), `authMethod`, `tenantId=root`, `operation`, `resource`, `action`, `decision`, `outcome`, `reasonCode`, `sourceAddress`, `durationMs`, `policyRevision` and `previousHash`.
 - No request or response bodies are logged. Never record passwords, bearer tokens, Secret IDs, bootstrap tokens, Shamir shares, root material, private keys, plaintext secrets, Authorization headers or raw idempotency keys.
 - Canonicalize the event payload using RFC 8785 JCS. Hash-chain each record with SHA-256 and domain separation over the previous 32-byte hash, monotonically increasing sequence and canonical payload. The algorithm and domain label are versioned; changing either requires a new audit schema version and verifier migration.
 - The JSONL file is append-only for the process, opened without following symlinks, owned by the service account and protected by restrictive directory/file permissions. A single-writer lock prevents two Community processes from appending to the same chain.
