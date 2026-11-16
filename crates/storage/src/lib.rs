@@ -1099,7 +1099,8 @@ pub fn decode_cursor(prefix: &[u8], cursor: &[u8]) -> Result<Vec<u8>, StorageErr
     Ok(last.to_vec())
 }
 
-fn decode_nonce_state(input: &[u8]) -> Result<(u64, u64, u64), NonceLedgerError> {
+/// Strictly decodes the durable nonce high-water mark and immutable policy.
+pub fn decode_nonce_state(input: &[u8]) -> Result<(u64, u64, u64), NonceLedgerError> {
     if input.len() != 28 || input.get(..4) != Some(NONCE_MAGIC.as_slice()) {
         return Err(NonceLedgerError::CorruptState);
     }
@@ -1238,7 +1239,8 @@ fn encode_checkpoint(checkpoint: &RotationCheckpoint) -> Vec<u8> {
     out.extend_from_slice(cursor);
     out
 }
-fn decode_checkpoint(input: &[u8]) -> Result<RotationCheckpoint, RotationStoreError> {
+/// Strictly decodes a durable resumable-rotation checkpoint.
+pub fn decode_checkpoint(input: &[u8]) -> Result<RotationCheckpoint, RotationStoreError> {
     if input.len() < 17 || input.get(..4) != Some(CHECKPOINT_MAGIC.as_slice()) {
         return Err(RotationStoreError::CorruptState);
     }
