@@ -1,17 +1,18 @@
 # Phase 2.0 — Owner decision register and contract baseline
 
-- **Status:** In progress. D2.0-01 (dual HTTP/JSON + gRPC transports with one shared security pipeline) is owner-approved in [ADR-0025](../adr/0025-dual-api-transports-shared-security-pipeline.md); D2.0-02 through D2.0-11 remain pending. **Subphase 2.0 is not complete.**
+- **Status:** In progress — consolidation and traceability of previously owner-approved architecture decisions. D2.0-01 explicitly records the existing approved dual HTTP/JSON + gRPC transport model. The remaining entries are not requests to decide these matters again; they identify where Community's abridged ADR carryover must be reconciled with the complete owner-approved baseline. An omission from a short public ADR is not evidence that the owner never decided it.
 - **Scope:** Ferrum Vault Community only.
 - **Parent:** [ROADMAP Phase 2](../../ROADMAP.md#phase-2-native-api-authentication-authorization-and-audit).
-- **Purpose:** Give the owner a concrete, traceable decision surface for Phase 2.0. This register records approved constraints, candidate operations, contract boundaries and unresolved choices. It is not an ADR and does not approve any candidate choice by implication.
+- **Purpose:** Consolidate and trace the existing owner-approved Phase 2 architecture into the public Community roadmap and ADRs. This register records binding decisions, operation coverage and precise traceability gaps. It is not a fresh decision questionnaire and must not reopen or replace prior owner approvals.
 
 ## 1. Decision-control rules
 
 1. Existing owner-approved ADR requirements remain binding. Phase 2.0 must apply them, not reopen or silently weaken them.
-2. Only the transport decision explicitly recorded in ADR-0025 is approved: both HTTP/JSON and gRPC share one authoritative security pipeline. Other options below are candidates only; no schema tooling, credential type, policy grammar, numeric limit, default, endpoint or audit algorithm is selected by this register.
-3. An implementation-affecting choice becomes binding only after the owner approves a new ADR or a superseding ADR and that decision is merged into Community main.
-4. A feature with an unresolved decision must remain disabled or outside the approved scope. It must not gain a permissive fallback.
-5. Phase 2.0 is design and approval work. It does not authorize Phase 2.1–2.6 runtime implementation. Phase 0's explicit owner closeout gate remains visible in the roadmap until recorded.
+2. The public ADRs in this repository are Community adaptations of an owner-approved source baseline, as explained in SOURCE-MAP.md. A missing detail in an abridged public adaptation is a documentation/provenance gap, not proof that no decision exists.
+3. Preserve and trace prior owner-approved decisions. Do not ask the owner to select again, substitute a new option or change an existing value merely because a public summary is brief.
+4. Only when the complete owner-approved baseline truly has no decision, or a genuine conflict exists, may a new owner decision be raised and recorded in a new/superseding ADR.
+5. A feature must not be implemented with guessed parameters. Use the already approved value when it exists; if its authoritative value cannot yet be verified, pause only that dependent implementation until the source decision is reconciled.
+6. Phase 2.0 consolidates the decisions and maps them to routes/contracts/tests. It does not authorize Phase 2.1–2.6 runtime implementation. Phase 0's explicit owner closeout gate remains visible in the roadmap until recorded.
 
 ## 2. Binding constraints inherited from approved ADRs
 
@@ -30,22 +31,22 @@
 | Administrative UI | MVP does not include a web UI; a later UI uses this same server/API and never replaces server-side controls | [ADR-0021](../adr/0021-user-interface.md) |
 | Verification | Apply unit, property, fuzz, integration, failure-injection, concurrency where appropriate, Miri where applicable, negative-security, E2E, benchmark and interoperability evidence; target 90% measured coverage for crypto, seal, policy, auth and audit | [ADR-0010](../adr/0010-testing-and-security-evidence.md) |
 
-## 3. Candidate native operation inventory — owner review required
+## 3. Native operation family cross-reference — reconcile with approved catalog
 
-This is an operation inventory, not an approved endpoint list. It deliberately does not assign HTTP methods, paths, schemas or response fields. Inclusion and exclusion must be decided by the owner before Phase 2.1.
+This cross-reference is not a substitute for the full approved endpoint catalog. It identifies operation families already within the system design so they can be mapped to the previously approved exact routes, methods, schemas and response fields. Do not treat this short summary as a reason to re-decide their inclusion or exclusion.
 
-| Area | Candidate operation family | Existing dependency / boundary | Phase 2.0 status |
+| Area | Operation family to map to the existing approved API catalog | Existing dependency / boundary | Phase 2.0 status |
 |---|---|---|---|
-| Service diagnostics | Process liveness, readiness and non-secret service diagnostics | Server lifecycle and dependency health are not yet implemented | Inclusion and information exposed pending |
-| Seal state | Read current seal/bootstrap state | ferrum-seal library; response may reveal operational state | Inclusion and sealed availability pending |
-| Bootstrap | Initialize/bootstrap the root ceremony and persist its state | Existing Phase 1 seal/recovery contracts; durable service composition required | Inclusion, caller authority and one-time behavior pending |
-| Unseal | Submit the mandatory Shamir 2-of-3 unseal material | Unsealer port; shares are sensitive and must never enter logs, audit bodies or artifacts | Inclusion, request representation and throttling pending |
-| Seal | Request a transition to Sealed | SealController boundary; mutation requires authorization and audit under approved rules | Inclusion and authority pending |
-| Root lifecycle | Generate/rotate/revoke root operations | Existing 2-of-3 RootQuorumPolicy; sensitive root material handling must be specified | Which operations are exposed over the API pending |
-| Authentication | Issue/inspect/renew/revoke credentials, if selected | Credential format, issuer and lifecycle are undecided | Mechanism and operation subset pending |
+| Service diagnostics | Process liveness, readiness and non-secret service diagnostics | Server lifecycle and dependency health are not yet implemented | Copy approved inclusion and permitted fields from the source catalog |
+| Seal state | Read current seal/bootstrap state | ferrum-seal library; response may reveal operational state | Copy approved route and sealed classification from the source catalog |
+| Bootstrap | Initialize/bootstrap the root ceremony and persist its state | Existing Phase 1 seal/recovery contracts; durable service composition required | Copy approved operation and caller authority; preserve one-time semantics |
+| Unseal | Submit the mandatory Shamir 2-of-3 unseal material | Unsealer port; shares are sensitive and must never enter logs, audit bodies or artifacts | Copy approved request contract and throttling policy; preserve Shamir 2-of-3 |
+| Seal | Request a transition to Sealed | SealController boundary; mutation requires authorization and audit under approved rules | Copy approved operation and authority rules |
+| Root lifecycle | Generate/rotate/revoke root operations | Existing 2-of-3 RootQuorumPolicy; sensitive root material handling must be specified | Copy approved root-operation surface and preserve independent 2-of-3 quorum |
+| Authentication | Issue/inspect/renew/revoke credentials, if selected | Credential format, issuer and lifecycle are undecided | Copy approved authentication mechanism and operation subset |
 | Identity administration | Create/disable/inspect identities, if selected | Trusted server-side principal model is undecided | Inclusion and authority pending |
-| Policy administration | Create/read/update/delete/list ACL policies, if selected | Policy grammar, storage and administrative recovery are undecided | Inclusion and operation subset pending |
-| Audit administration | Verify audit-chain integrity and inspect non-secret sink status, if selected | Audit schema, verification and operational permissions are undecided | Whether exposed through API or operator tooling pending |
+| Policy administration | Create/read/update/delete/list ACL policies, if selected | Policy grammar, storage and administrative recovery are undecided | Copy approved identity operation set and authority |
+| Audit administration | Verify audit-chain integrity and inspect non-secret sink status, if selected | Audit schema, verification and operational permissions are undecided | Copy approved exposure channel and permissions |
 
 ### Explicit Phase 2 exclusions
 
@@ -58,112 +59,84 @@ The following are not native Phase 2 operations and must not be represented as i
 - CLI, UI and distribution/packaging workflows (their later roadmap phases).
 - Vault API compatibility routes (later optional work under ADR-0018).
 
-## 4. Route security-classification worksheet
+## 4. Route security-classification cross-reference
 
-The following categories must be populated for every selected operation before its route contract is approved. The entries below are intentionally unresolved; they are not permissive defaults.
+Apply the already approved route classifications to every selected operation. The labels below indicate fields that must be copied from the source catalog; they are not invitations to create new classifications or choose new defaults.
 
 | Operation category | Available while sealed? | Authentication | Authorization | Required audit intent/outcome | Additional invariant |
 |---|---|---|---|---|---|
-| Liveness/readiness | Owner must distinguish liveness from dependency readiness and approve the fields | Pending | Pending | Pending | Must not disclose secrets, credentials, shares or protected values |
-| Seal-state diagnostics | Pending | Pending | Pending | Pending | State disclosure and information exposure require explicit review |
-| Bootstrap | Only its necessary pre-unseal lifecycle can be considered; exact rule pending | Bootstrap authority pending | Pending | Sensitive lifecycle audit per approved contract | One-time/replay protection; never persist or log shares/tokens in plaintext |
-| Unseal | Must be reachable in the sealed state if the API owns unseal; exact exposure pending | Shamir 2-of-3 proof is mandatory; transport/auth envelope pending | Pending | Intent/outcome semantics pending | Reject wrong, duplicate, mixed-ceremony or insufficient shares; no provider fallback |
-| Seal | Not applicable as an unsealed-only action; precise behavior pending | Pending | Pending | Required for sensitive mutation | Failure must not leave a partially transitioned state |
-| Root lifecycle | Pending | Separate 2-of-3 root-operation quorum remains mandatory | Pending | Required for sensitive mutation | API auth must not replace or weaken the independent quorum |
-| Credential/identity changes | Pending | Pending | Pending | Required for security-sensitive changes | Secret credential material never appears in logs or audit payloads |
-| ACL policy changes | Pending | Pending | Administrative policy is deny-by-default | Required | Policy change/lockout recovery and atomicity must be defined |
-| Audit verification/diagnostics | Pending | Pending | Pending | Avoid recursive audit requirements that prevent recovery; exact approach pending | Diagnostics must not expose protected audit contents or bypass sink-failure behavior |
+| Liveness/readiness | Copy approved health/readiness exposure and fields | Pending | Pending | Pending | Must not disclose secrets, credentials, shares or protected values |
+| Seal-state diagnostics | Copy approved sealed-state rule | Copy approved auth rule | Copy approved ACL rule | Copy approved audit rule | Preserve approved limits on state disclosure |
+| Bootstrap | Copy approved bootstrap sealed-mode rule | Copy approved bootstrap authority | Pending | Sensitive lifecycle audit per approved contract | One-time/replay protection; never persist or log shares/tokens in plaintext |
+| Unseal | Copy approved sealed-mode exposure | Mandatory Shamir 2-of-3; copy approved request/auth envelope | Copy approved authorization rule | Copy approved intent/outcome rule | Reject wrong, duplicate, mixed-ceremony or insufficient shares; no provider fallback |
+| Seal | Copy approved sealed-state rule | Copy approved authentication rule | Copy approved authorization rule | Required for sensitive mutation per approved policy | Failure must not leave a partially transitioned state |
+| Root lifecycle | Copy approved sealed-state rule | Separate 2-of-3 root-operation quorum remains mandatory | Copy approved authorization rule | Required for sensitive mutation | API auth must not replace or weaken the independent quorum |
+| Credential/identity changes | Copy approved sealed-state rule | Copy approved authentication rule | Copy approved authorization rule | Required for security-sensitive changes | Secret credential material never appears in logs or audit payloads |
+| ACL policy changes | Copy approved sealed-state rule | Copy approved authentication rule | Administrative policy is deny-by-default; copy approved admin roles | Required | Policy change/lockout recovery and atomicity must be defined |
+| Audit verification/diagnostics | Copy approved sealed-state rule | Copy approved authentication rule | Copy approved audit permissions | Preserve approved non-recursive failure/recovery handling | Diagnostics must not expose protected audit contents or bypass sink-failure behavior |
 
-## 5. Owner-pending decision register
+## 5. Decision provenance and implementation traceability
 
-D2.0-01 is **Owner-approved** in ADR-0025. D2.0-02 through D2.0-11 remain **Pending owner decision**. Remaining alternatives are prompts for evaluation, not recommendations, defaults or commitments.
+These entries are **not a request to decide again**. They separate what the current public Community record explicitly proves from details that must be carried over from the complete, previously owner-approved architecture baseline. The owner-approved source decision remains authoritative; do not replace it with a candidate alternative. Where the public Community adaptation does not reproduce a detail, record the provenance link or adapt that existing decision into the Community ADR. Only a genuine gap in the original approved baseline can become a new decision.
 
-### D2.0-01 — Transport and server implementation
+### D2.0-01 — Native transports and shared request pipeline
 
-- **Owner decision:** **APPROVED — HTTP/JSON and gRPC are both native Phase 2 MVP transports.** They must share one authoritative security pipeline and logical request/security context; transport adapters may only perform protocol-specific decoding/encoding and may not duplicate or weaken security controls.
+- **Status:** **ALREADY APPROVED in the owner architecture baseline** by ADR-0005's HTTP/gRPC server requirement; this Community record explicitly confirms both native transports, with HTTP using JSON, and one shared authoritative security pipeline.
 - **ADR:** [ADR-0025 — Dual native API transports with a shared security pipeline](../adr/0025-dual-api-transports-shared-security-pipeline.md).
 - **Must preserve:** TLS 1.3 via rustls, the exact ADR-0005 pipeline order and equivalent security semantics across both transports.
 - **Still open:** server/framework selection, listener topology, JSON schema/source-of-truth tooling, gRPC IDL/serialization tooling, cross-transport error mapping and operation-by-operation transport coverage.
-- **Approval date:** 2026-11-15.
+- **Treatment:** consolidation/clarification of the prior decision, not a request to choose the transport again.
 
 ### D2.0-02 — Wire/schema and error contract
 
-- **Required decision:** HTTP/JSON contract schema/source of truth, gRPC IDL/serialization schema and the mapping of validation/typed errors across the two transports.
-- **Candidate directions to evaluate:** separately maintained or generated HTTP/JSON schemas; a gRPC IDL and corresponding generation approach; an explicitly documented shared error taxonomy.
-- **Must preserve:** HTTP uses JSON representations, the native HTTP API follows /v1, internal typed errors remain stable and responses never disclose secrets.
-- **Impact:** API clients, compatibility tests, generated code, parser/fuzz scope and error disclosure.
-- **Not selected:** schema language/tooling, gRPC IDL, code generator, exact error fields or HTTP/gRPC status mapping.
+- **Already fixed:** native HTTP transport uses JSON and /v1; gRPC is also a native transport. API versioning is semantic with the two-minor deprecation policy (ADR-0015).
+- **Traceability task:** carry over the previously owner-approved schema/IDL, serialization and error-mapping decisions from the authoritative design record into the Community API contract docs. Do not select a new schema or error design from the examples previously listed here.
+- **Do not reopen:** protocol format or versioning choices already approved. Any details absent from the short Community ADR summary must first be reconciled against the approved source baseline.
 
 ### D2.0-03 — Native endpoint and operation catalog
 
-- **Required decision:** select the Phase 2 system/administration operations from §3, state their exact inclusion/exclusion, and approve their route/method names in the API contract stage.
-- **Candidate scope:** service diagnostics; seal/bootstrap/unseal/seal lifecycle; selected root lifecycle operations; selected auth/identity operations; selected policy administration; optional audit diagnostics.
-- **Must preserve:** no KV, PKI, Transit, HA or Vault-compatibility routes in this phase unless a separately approved roadmap change is made.
-- **Impact:** exposed attack surface and dependencies for 2.1–2.6.
-- **Not selected:** route names, methods, payloads or final MVP subset.
+- **Already fixed:** engine boundaries and roadmap ordering for PKI, KV v2/leases, Transit, HA, CLI, UI and optional Vault compatibility are defined by the approved roadmap/ADRs; those operations must not be pulled forward into the native Phase 2 MVP.
+- **Traceability task:** consolidate the already approved Phase 2 system, seal, auth, policy and audit operations, routes/methods and explicit exclusions from the full owner-approved API design. Do not invent a smaller/different MVP list or ask for these decisions again.
 
 ### D2.0-04 — Authentication mechanism and credential representation
 
-- **Required decision:** supported authentication method(s), credential entropy/representation, transport, storage and validation boundary.
-- **Candidate directions to evaluate:** opaque bearer credentials issued by the service; mutual-TLS client identities; an external identity-provider integration; a deliberately smaller first-release mechanism.
-- **Must preserve:** authentication creates the trusted principal; clients cannot supply/override principal or tenant; credentials are never logged or placed in audit bodies; failed authentication is fail-closed.
-- **Impact:** bootstrap, credential theft/replay threats, renewal/revocation, storage encryption and integration tests.
-- **Not selected:** token format, signing/MAC algorithm, password use, external provider, credential TTL or storage format.
+- **Already fixed:** the ordered authentication stage in ADR-0005; dynamically dispatched authentication extensions follow ADR-0002 async_trait + Send + Sync and its cancellation/lifetime/error/concurrency/security contract; trusted principal context is server-owned.
+- **Traceability task:** carry over the previously approved authentication methods, credential format, credential storage/validation and bootstrap authority from the complete owner-approved design. Do not substitute AppRole/Vault compatibility, a new token type, passwords, mTLS identity or an external IdP merely because they appeared as examples in the earlier draft.
 
 ### D2.0-05 — Identity and credential lifecycle
 
-- **Required decision:** principal model and issuance/bootstrap, expiry, renewal, revocation, rotation, invalidation, replay and recovery semantics.
-- **Candidate fields for review only:** stable subject identifier, credential identifier, authentication method and lifecycle timestamps.
-- **Must preserve:** server-generated identity context and ADR-0002 async extension guarantees for dynamically dispatched authenticators.
-- **Impact:** session invalidation, concurrent requests, audit attribution and identity-rate-limit keys.
-- **Not selected:** identity schema, token/session model, lifetime values or revocation data structure.
+- **Already fixed:** authentication must produce trusted server-side identity context; identity-based rate limiting follows authentication; client-supplied identity/tenant cannot override server context.
+- **Traceability task:** reproduce the existing owner-approved principal schema, credential lifecycle and expiry/renewal/revocation/rotation/replay behavior in the Community contract docs. This register does not create new fields or lifetimes.
 
 ### D2.0-06 — ACL and canonical resource semantics
 
-- **Required decision:** policy grammar, resource/path representation, actions/capabilities, matching and precedence, policy versioning/update behavior, administrative bootstrap and lockout recovery.
-- **Candidate directions to evaluate:** exact canonical paths; segment-aware path patterns; resource/action tuples with explicit capabilities.
-- **Must preserve:** canonicalization before policy evaluation, deny-by-default, Community tenant root from trusted context and no client-selected tenant.
-- **Impact:** confused-deputy/path traversal, privilege escalation, policy parser fuzzing and policy update atomicity.
-- **Not selected:** grammar, wildcard semantics, capability vocabulary, precedence or policy storage shape.
+- **Already fixed:** canonical route/ACL evaluation occurs in the ADR-0005 pipeline; authorization is deny-by-default as specified in the approved Phase 2 roadmap; Community tenant is root and derived from trusted server context per ADR-0019.
+- **Traceability task:** carry over the previously approved ACL grammar, capability vocabulary, matching/precedence and policy lifecycle from the complete design record. Do not replace the approved model with an alternative merely because the summary ADR does not repeat its syntax.
 
-### D2.0-07 — Rate limiting, trusted proxy and request bounds
+### D2.0-07 — Rate limits, trusted proxy and request bounds
 
-- **Required decision:** pre-auth source identity, post-auth principal key, algorithm/window/burst, local versus shared scope, trusted-proxy model, body-size limits, timeouts and failure behavior.
-- **Candidate directions to evaluate:** fixed window, sliding window or token bucket; direct-peer-only client address or explicitly configured trusted proxy chain.
-- **Must preserve:** separate pre-auth IP and post-auth identity gates in ADR-0005; never trust spoofable forwarding headers by default.
-- **Impact:** denial-of-service resistance, multi-process consistency, false blocking and observability.
-- **Not selected:** numeric quotas, burst, time windows, maximum sizes, deadlines, storage backend or proxy CIDRs.
+- **Already fixed:** distinct IP-based pre-auth and identity-based post-auth rate-limit stages and request size/time bounds are mandatory in ADR-0005.
+- **Traceability task:** import the previously approved algorithm, quotas/windows/bursts, limits, trusted-proxy semantics and scope. Do not propose new numeric values or algorithms until the complete approved decision source has been reconciled.
 
 ### D2.0-08 — Sealed-mode allowlist
 
-- **Required decision:** exact operations and response fields that remain available while sealed.
-- **Candidate areas for review:** liveness; carefully minimized readiness; seal-state status; the unseal operation itself.
-- **Must preserve:** all unspecified operations are unavailable while sealed; allowlist entries must be demonstrably non-sensitive and minimal.
-- **Impact:** information disclosure, bootstrap exposure and recovery availability.
-- **Not selected:** any route, response field or authentication exception.
+- **Already fixed:** only a minimal, explicit allowlist of non-sensitive endpoints may remain available while Sealed (ADR-0005).
+- **Traceability task:** reproduce the exact already approved endpoint/field allowlist and any authentication exceptions from the owner-approved service design. Do not silently broaden it or replace it with a newly suggested list.
 
 ### D2.0-09 — TLS certificate and trust lifecycle
 
-- **Required decision:** certificate/key provisioning, trust roots, reload/rotation and operator error behavior.
-- **Candidate directions to evaluate:** operator-managed PEM files; platform-managed certificate material; another explicitly justified provider.
-- **Must preserve:** TLS 1.3 with rustls; invalid required TLS configuration fails closed; private keys are not logged or included in diagnostics.
-- **Impact:** deployment, rotation downtime, trust boundaries and secret handling.
-- **Not selected:** provisioning mechanism, file paths, formats, reload semantics or trust-root defaults.
+- **Already fixed:** TLS 1.3 and rustls are mandatory (ADR-0005).
+- **Traceability task:** carry over the existing owner-approved certificate provisioning, trust, rotation and reload requirements. The ADR-0005 summary does not enumerate those details; its brevity is not permission to choose a different lifecycle.
 
-### D2.0-10 — Audit event, hash chain and sink durability
+### D2.0-10 — Durable audit event, hash chain and sinks
 
-- **Required decision:** event schema, canonical serialization, hash algorithm/chain metadata, append atomicity, fsync/durability boundary, sink configuration, file rotation/archival/export and verification procedure.
-- **Must preserve:** ADR-0005 minimum destinations and 90-day configurable default; intent before sensitive action/read disclosure; durable outcome after; fail closed when a required write cannot be persisted.
-- **Impact:** tamper evidence, truncation/reordering detection, crash recovery, storage pressure and forensic usability.
-- **Not selected:** hash algorithm, canonical encoding, exact event fields, file format details, fsync policy, sink fan-out policy, archive mechanism or verification CLI/API.
+- **Already fixed:** JSON-file hash-chain integrity plus stdout/syslog are the minimum destinations; retention is configurable with a 90-day default; intent must be durable before sensitive operations/disclosure and the result is recorded durably afterward; failure is fail-closed; local hash chains do not claim off-host immutability (ADR-0005).
+- **Traceability task:** carry over the previously approved canonical event schema, hash/chain details, write durability and rotation/archive rules. Do not replace the approved algorithm or event contract with a new one.
 
 ### D2.0-11 — Audit/state coordination and service operations
 
-- **Required decision:** transaction boundary for audit plus state; use of outbox/idempotency/reconciliation when the same transaction cannot cover both; configuration source/format; startup validation; health/readiness meanings; graceful shutdown and supported deployment assumptions.
-- **Candidate directions to evaluate:** a shared storage transaction where supported; durable outbox with reconciliation when state and audit sinks are separate.
-- **Must preserve:** no sensitive operation without durable audit intent; no silent success when outcome recording is required; unsafe or incomplete security configuration fails closed.
-- **Impact:** crash consistency, duplicate/missing audit events, recovery procedure and operator responsibilities.
-- **Not selected:** outbox schema, idempotency key format, retry policy, configuration format, readiness dependencies or shutdown deadline.
+- **Already fixed:** when audit and business state cannot share a transaction, use an outbox, idempotency and reconciliation (ADR-0005); Phase 1 redb atomic transaction contracts apply wherever their documented boundary covers the operation (ADR-0003); server distribution policy is in ADR-0022.
+- **Traceability task:** reconcile existing approved decisions for the outbox schema/idempotency/recovery workflow, validated service configuration, health/readiness and graceful shutdown. Do not design a replacement from scratch or assume that a short public ADR contains the whole contract.
 
 ## 6. Logical interface and contract boundaries
 
@@ -216,23 +189,23 @@ Every discovered defect becomes a deterministic regression test. Test data, fuzz
 
 ## 9. Owner decision and approval record
 
-Complete one row per decision. A blank or "deferred" row is not approval; a dependent feature stays disabled until its decision is approved.
+This table tracks the provenance of decisions the owner says were already approved. It is not a request to select again. Add the authoritative source ADR/section and the Community carryover reference for each item.
 
 | Decision ID | Owner selection / explicit exclusion | Rationale and trade-offs | ADR reference | Approval date |
 |---|---|---|---|---|
 | D2.0-01 | HTTP/JSON + gRPC; one shared authoritative security pipeline | Two native access transports without duplicated/weaker security controls | [ADR-0025](../adr/0025-dual-api-transports-shared-security-pipeline.md) | 2026-11-15 |
-| D2.0-02 | Pending | Pending | Pending | Pending |
-| D2.0-03 | Pending | Pending | Pending | Pending |
-| D2.0-04 | Pending | Pending | Pending | Pending |
-| D2.0-05 | Pending | Pending | Pending | Pending |
-| D2.0-06 | Pending | Pending | Pending | Pending |
-| D2.0-07 | Pending | Pending | Pending | Pending |
-| D2.0-08 | Pending | Pending | Pending | Pending |
-| D2.0-09 | Pending | Pending | Pending | Pending |
-| D2.0-10 | Pending | Pending | Pending | Pending |
-| D2.0-11 | Pending | Pending | Pending | Pending |
+| D2.0-02 | Previously owner-approved; carry over without re-selection | Preserve original rationale and behavior | Link existing source decision and Community ADR | Existing approval |
+| D2.0-03 | Previously owner-approved; carry over without re-selection | Preserve original rationale and behavior | Link existing source decision and Community ADR | Existing approval |
+| D2.0-04 | Previously owner-approved; carry over without re-selection | Preserve original rationale and behavior | Link existing source decision and Community ADR | Existing approval |
+| D2.0-05 | Previously owner-approved; carry over without re-selection | Preserve original rationale and behavior | Link existing source decision and Community ADR | Existing approval |
+| D2.0-06 | Previously owner-approved; carry over without re-selection | Preserve original rationale and behavior | Link existing source decision and Community ADR | Existing approval |
+| D2.0-07 | Previously owner-approved; carry over without re-selection | Preserve original rationale and behavior | Link existing source decision and Community ADR | Existing approval |
+| D2.0-08 | Previously owner-approved; carry over without re-selection | Preserve original rationale and behavior | Link existing source decision and Community ADR | Existing approval |
+| D2.0-09 | Previously owner-approved; carry over without re-selection | Preserve original rationale and behavior | Link existing source decision and Community ADR | Existing approval |
+| D2.0-10 | Previously owner-approved; carry over without re-selection | Preserve original rationale and behavior | Link existing source decision and Community ADR | Existing approval |
+| D2.0-11 | Previously owner-approved; carry over without re-selection | Preserve original rationale and behavior | Link existing source decision and Community ADR | Existing approval |
 
-## 10. Phase 2.0 acceptance checklist
+## 10. Phase 2.0 completion checklist
 
 - [ ] Owner approves the final native operation catalog and explicit exclusions.
 - [ ] Every decision D2.0-01 through D2.0-11 is owner-approved or explicitly deferred with dependent feature disabled.
@@ -243,4 +216,4 @@ Complete one row per decision. A blank or "deferred" row is not approval; a depe
 - [ ] Roadmap and ADR index link to the approved records.
 - [ ] Phase 0 owner closeout gate is recorded before Phase 2.1 runtime implementation begins.
 
-**Current result:** the design register and candidate inventory are prepared for review. Because all owner-pending selections remain pending, Phase 2.0 is **not yet complete**, and no Phase 2 runtime implementation is authorized by this document.
+**Current result:** the existing Phase 2 architecture is to be consolidated, not re-decided. The owner has clarified that D2.0-02 through D2.0-11 were already approved; their entries track source/carryover references rather than asking for new selections. Remaining work is to copy those approved specifics into the public Community records and map operations to tests. No Phase 2 runtime implementation is authorized before the Phase 0 entry gate and completion of this documentation reconciliation.
