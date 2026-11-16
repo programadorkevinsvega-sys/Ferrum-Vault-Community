@@ -801,7 +801,7 @@ components:
       type: object
       required: [share]
       properties:
-        share: { type: string, minLength: 1, maxLength: 4096, writeOnly: true, description: Canonical binary FRS1 envelope encoded as unpadded base64url without padding; maximum decoded length 3072 bytes. }
+        share: { type: string, minLength: 1, maxLength: 1398102, writeOnly: true, description: Canonical binary FRS1 envelope encoded as unpadded base64url without padding; HTTP request-body ceiling is 1 MiB and caps the decoded envelope accordingly. }
       additionalProperties: false
     ShareProgress:
       type: object
