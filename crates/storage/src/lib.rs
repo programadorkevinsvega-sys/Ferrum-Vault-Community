@@ -1992,7 +1992,12 @@ mod tests {
             .register_dependency("community/test-key", 1, DependencyKind::Backup, b"backup-1")
             .unwrap();
         store
-            .register_dependency("community/test-key", 1, DependencyKind::Snapshot, b"snapshot-1")
+            .register_dependency(
+                "community/test-key",
+                1,
+                DependencyKind::Snapshot,
+                b"snapshot-1",
+            )
             .unwrap();
         store.confirm_inventory_reconciled().unwrap();
         assert!(store.has_dependencies(&key_id(), 1).unwrap());
@@ -2004,7 +2009,12 @@ mod tests {
         assert!(store.has_dependencies(&key_id(), 1).unwrap());
         assert!(
             store
-                .remove_dependency("community/test-key", 1, DependencyKind::Snapshot, b"snapshot-1")
+                .remove_dependency(
+                    "community/test-key",
+                    1,
+                    DependencyKind::Snapshot,
+                    b"snapshot-1",
+                )
                 .unwrap()
         );
         assert!(!store.has_dependencies(&key_id(), 1).unwrap());
