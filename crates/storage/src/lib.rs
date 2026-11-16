@@ -1401,7 +1401,9 @@ mod tests {
             tx.set_durability(Durability::Immediate).unwrap();
             let mut table = tx.open_table(KV).unwrap();
             let encoded = encode_versioned(1, &envelope(1));
-            table.insert(b"kv/legacy".as_slice(), encoded.as_slice()).unwrap();
+            table
+                .insert(b"kv/legacy".as_slice(), encoded.as_slice())
+                .unwrap();
             drop(table);
             tx.commit().unwrap();
         }
