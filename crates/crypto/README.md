@@ -2,7 +2,9 @@
 
 **Phase 1.1 implementation scope:** approved provider selection and AES-256-GCM primitive validation.
 
-**Phase 1.2 implementation scope:** asynchronous, object-safe key-management provider contract, stable authenticated context and canonical wrapped-key envelope encoding. No cloud KMS adapter is included.
+**Phase 1.2 implementation scope:** asynchronous, object-safe key-management provider contract, stable authenticated context and canonical wrapped-key envelope encoding.
+
+**Phase 1.6 implementation scope:** canonical ADR-0004 AAD, strict FBE1 envelopes, versioned DEK selection, explicit durable nonce-use reservations, key-retention checks and bounded resumable re-encryption orchestration.
 
 ## Provider decision
 
@@ -26,7 +28,9 @@ The provider must cryptographically bind both KeyContext bytes and the envelope'
 
 Dropping an async future cancels the caller's wait but does not promise rollback of an already accepted remote operation. Implementations must not release partial plaintext or envelopes; callers must treat a cancelled remote outcome as unknown and follow the provider-specific retry contract.
 
-This is still not the complete storage barrier. The KMP interface does not implement seal lifecycle, seal-root/keyring/DEK orchestration, a key database, cloud KMS, canonical barrier AAD, nonce-use accounting, rotation, persistence or re-encryption. Those remain in their assigned Phase 1 subphases.
+Phase 1.6 adds barrier.rs: FBE1 serialization; fixed-order, length-prefixed AAD (tenant root, format version, key version, canonical path); writes through the active key version; reads through the recorded key version; nonce reservations obtained before encryption; and a bounded rotation worker with durable checkpoints and atomic compare-and-swap/audit store contracts. Old DEKs cannot be retired until an injected inventory proves that records, backups, snapshots and rotation jobs no longer reference them. A page with any compare-and-swap conflict remains incomplete and retains its starting cursor; the worker replays the page, authenticates already-migrated rows, and re-reads conflicted rows before advancing.
+
+The exact production rotation threshold and nonce-reservation block size remain owner-pending. NonceBudgetConfig has no default and requires explicit values; it only enforces the hard less-than-2^32 invocation ceiling, not an owner-approved operational margin. The NonceUsageLedger, RotationStore and key-dependency inventory are contracts only in Phase 1.6. Their concrete atomic/durable redb implementation and restart/concurrency conformance belong to Phase 1.7. This crate has no in-memory production fallback and must not be described as production-ready.
 
 ## Validation expected for Phase 1.2
 

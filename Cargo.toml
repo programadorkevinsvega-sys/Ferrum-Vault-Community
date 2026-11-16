@@ -12,6 +12,7 @@ repository = "https://github.com/programadorkevinsvega-sys/Ferrum-Vault-Communit
 async-trait = "=0.1.89"
 aws-lc-rs = { version = "=1.19.0", default-features = false, features = ["non-fips"] }
 criterion = "=0.8.2"
+proptest = "=1.9.0"
 rand = { version = "=0.10.3", default-features = false, features = ["thread_rng", "std_rng"] }
 rand_core = "=0.10.1"
 serde_json = "1"

@@ -19,9 +19,14 @@ that introduces the relevant parser, envelope or protocol; do not defer fuzzing.
 | `seal_bootstrap_transitions` | Arbitrary bootstrap token encodings and malformed/replayed bootstrap attempts never panic or move an uninitialized controller into an initialized state. |
 | `root_quorum_authorization` | Root generate/rotate/revoke callbacks require an explicit 2-of-3 FRS1 policy and reject one, duplicate, corrupt, mixed-ceremony or arbitrary fragments. All secret values are generated at runtime. |
 | `shamir_unsealer` | The mandatory default Shamir unsealer accepts only 2-of-3 shares from the expected ceremony and rejects one, duplicate, corrupt, mixed-ceremony, generic 5-of-3 and arbitrary fragments. |
+| `barrier_envelope_decode` | Arbitrary FBE1 input never panics; accepted envelopes round-trip byte-for-byte and non-canonical/trailing data is rejected. |
+| `barrier_aad_invariants` | Arbitrary canonical-path bytes produce deterministic AAD; path and key-version changes alter the authenticated encoding. |
+| `barrier_nonce_rotation` | Explicit test policies plus an atomic ledger model never reuse reservation counters and require rotation before the configured use ceiling. |
 
-The AES-GCM primitive's `SealedPayload` keeps the nonce at `[u8; 12]` and
-ciphertext/tag bytes separately. The KMP layer adds the serialized FVK1
+The Phase 1.6 FBE1 envelope parser and ADR-0004 AAD encoder have dedicated fuzz
+coverage. Nonce-budget fuzzing uses a synthetic atomic ledger only; it does not
+stand in for a durable production adapter. The AES-GCM primitive's SealedPayload
+keeps the nonce at [u8; 12] and ciphertext/tag bytes separately. The KMP layer adds the serialized FVK1
 `WrappedKey` envelope; `wrapped_key_decode` fuzzes its strict decoder with
 arbitrary bytes, while `key_context_mutations` checks authenticated FVC1 context
 changes. Keep these targets separate because they exercise different boundaries.
@@ -45,6 +50,9 @@ cargo +nightly-2026-11-12 fuzz run recovery_share_mutations -- -max_total_time=3
 cargo +nightly-2026-11-12 fuzz run seal_bootstrap_transitions -- -max_total_time=300 -max_len=65536 -timeout=10
 cargo +nightly-2026-11-12 fuzz run root_quorum_authorization -- -max_total_time=300 -max_len=65536 -timeout=10
 cargo +nightly-2026-11-12 fuzz run shamir_unsealer -- -max_total_time=300 -max_len=65536 -timeout=10
+cargo +nightly-2026-11-12 fuzz run barrier_envelope_decode -- -max_total_time=300 -max_len=65536 -timeout=10
+cargo +nightly-2026-11-12 fuzz run barrier_aad_invariants -- -max_total_time=300 -max_len=65536 -timeout=10
+cargo +nightly-2026-11-12 fuzz run barrier_nonce_rotation -- -max_total_time=300 -max_len=65536 -timeout=10
 ```
 
 ## CI policy
