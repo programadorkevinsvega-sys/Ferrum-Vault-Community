@@ -443,11 +443,16 @@ impl KvBackend for RedbStore {
             .begin_read()
             .map_err(|_| StorageError::Unavailable)?;
         let table = tx.open_table(KV).map_err(|_| StorageError::Unavailable)?;
-        table
+        let stored = table
             .get(key)
-            .map_err(|_| StorageError::Unavailable)?
-            .map(|v| decode_versioned(v.value()))
-            .transpose()
+            .map_err(|_| StorageError::Unavailable)?;
+        match stored {
+            Some(value) => {
+                let (version, value) = decode_versioned_record(value.value())?;
+                Ok(value.map(|value| StoredValue { version, value }))
+            }
+            None => Ok(None),
+        }
     }
 
     fn put(&self, key: &[u8], value: &[u8]) -> Result<u64, StorageError> {
@@ -458,7 +463,7 @@ impl KvBackend for RedbStore {
         let old = table
             .get(key)
             .map_err(|_| StorageError::Unavailable)?
-            .map(|v| decode_versioned(v.value()).map(|r| r.version))
+            .map(|v| decode_versioned_record(v.value()).map(|record| record.0))
             .transpose()?;
         let version = old
             .map(|v| v.checked_add(1).ok_or(StorageError::VersionExhausted))
@@ -477,13 +482,26 @@ impl KvBackend for RedbStore {
         validate_key(key)?;
         let tx = self.begin_write()?;
         let mut table = tx.open_table(KV).map_err(|_| StorageError::Unavailable)?;
-        let removed = table
-            .remove(key)
+        let current = table
+            .get(key)
             .map_err(|_| StorageError::Unavailable)?
-            .is_some();
+            .map(|value| decode_versioned_record(value.value()))
+            .transpose()?;
+        let Some((version, Some(_))) = current else {
+            drop(table);
+            tx.commit().map_err(|_| StorageError::Unavailable)?;
+            return Ok(false);
+        };
+        let next_version = version
+            .checked_add(1)
+            .ok_or(StorageError::VersionExhausted)?;
+        let tombstone = encode_tombstone(next_version);
+        table
+            .insert(key, tombstone.as_slice())
+            .map_err(|_| StorageError::Unavailable)?;
         drop(table);
         tx.commit().map_err(|_| StorageError::Unavailable)?;
-        Ok(removed)
+        Ok(true)
     }
 
     fn list(
@@ -510,16 +528,19 @@ impl KvBackend for RedbStore {
             if !key.starts_with(prefix) || after.as_ref().is_some_and(|a| key <= a.as_slice()) {
                 continue;
             }
+            let (version, decoded) = decode_versioned_record(value.value())?;
+            let Some(decoded) = decoded else {
+                continue;
+            };
             if records.len() == limit {
                 has_more = true;
                 break;
             }
-            let decoded = decode_versioned(value.value())?;
             last = Some(key.to_vec());
             records.push(KvRecord {
                 key: key.to_vec(),
-                version: decoded.version,
-                value: decoded.value,
+                version,
+                value: decoded,
             });
         }
         let next_cursor = if has_more {
@@ -574,8 +595,12 @@ impl KvBackend for RedbStore {
             let actual = table
                 .get(condition.key.as_slice())
                 .map_err(|_| StorageError::Unavailable)?
-                .map(|v| decode_versioned(v.value()).map(|r| r.version))
-                .transpose()?;
+                .map(|value| {
+                    decode_versioned_record(value.value())
+                        .map(|(version, value)| value.map(|_| version))
+                })
+                .transpose()?
+                .flatten();
             if actual != condition.expected_version {
                 return Err(StorageError::Conflict);
             }
@@ -589,7 +614,7 @@ impl KvBackend for RedbStore {
                     let prior = table
                         .get(key.as_slice())
                         .map_err(|_| StorageError::Unavailable)?
-                        .map(|v| decode_versioned(v.value()).map(|r| r.version))
+                        .map(|v| decode_versioned_record(v.value()).map(|record| record.0))
                         .transpose()?;
                     let version = prior
                         .map(|v| v.checked_add(1).ok_or(StorageError::VersionExhausted))
@@ -602,9 +627,20 @@ impl KvBackend for RedbStore {
                     versions.push(Some(version));
                 }
                 Mutation::Delete { key } => {
-                    table
-                        .remove(key.as_slice())
-                        .map_err(|_| StorageError::Unavailable)?;
+                    let current = table
+                        .get(key.as_slice())
+                        .map_err(|_| StorageError::Unavailable)?
+                        .map(|value| decode_versioned_record(value.value()))
+                        .transpose()?;
+                    if let Some((version, Some(_))) = current {
+                        let next_version = version
+                            .checked_add(1)
+                            .ok_or(StorageError::VersionExhausted)?;
+                        let tombstone = encode_tombstone(next_version);
+                        table
+                            .insert(key.as_slice(), tombstone.as_slice())
+                            .map_err(|_| StorageError::Unavailable)?;
+                    }
                     versions.push(None);
                 }
             }
@@ -873,14 +909,28 @@ fn validate_value(value: &[u8]) -> Result<(), StorageError> {
     }
     Ok(())
 }
+const VALUE_PRESENT: u8 = 1;
+const VALUE_TOMBSTONE: u8 = 0;
+
 fn encode_versioned(version: u64, value: &[u8]) -> Vec<u8> {
-    let mut out = Vec::with_capacity(8 + value.len());
+    let mut out = Vec::with_capacity(9 + value.len());
     out.extend_from_slice(&version.to_be_bytes());
+    out.push(VALUE_PRESENT);
     out.extend_from_slice(value);
     out
 }
-pub fn decode_versioned(input: &[u8]) -> Result<StoredValue, StorageError> {
-    if input.len() < 8 {
+
+fn encode_tombstone(version: u64) -> Vec<u8> {
+    let mut out = Vec::with_capacity(9);
+    out.extend_from_slice(&version.to_be_bytes());
+    out.push(VALUE_TOMBSTONE);
+    out
+}
+
+/// Decodes a versioned record. A tombstone is represented by None but retains
+/// its monotonically increasing version for future writes and CAS preconditions.
+pub fn decode_versioned_record(input: &[u8]) -> Result<(u64, Option<Vec<u8>>), StorageError> {
+    if input.len() < 9 {
         return Err(StorageError::CorruptRecord);
     }
     let version = u64::from_be_bytes(
@@ -888,13 +938,21 @@ pub fn decode_versioned(input: &[u8]) -> Result<StoredValue, StorageError> {
             .try_into()
             .map_err(|_| StorageError::CorruptRecord)?,
     );
-    if version == 0 || input.len() - 8 > MAX_VALUE_LEN {
+    if version == 0 || input.len() - 9 > MAX_VALUE_LEN {
         return Err(StorageError::CorruptRecord);
     }
-    Ok(StoredValue {
-        version,
-        value: input[8..].to_vec(),
-    })
+    match input[8] {
+        VALUE_TOMBSTONE if input.len() == 9 => Ok((version, None)),
+        VALUE_PRESENT => Ok((version, Some(input[9..].to_vec()))),
+        _ => Err(StorageError::CorruptRecord),
+    }
+}
+
+/// Decodes only a live record. Tombstones are not visible through KV reads.
+pub fn decode_versioned(input: &[u8]) -> Result<StoredValue, StorageError> {
+    let (version, value) = decode_versioned_record(input)?;
+    let value = value.ok_or(StorageError::CorruptRecord)?;
+    Ok(StoredValue { version, value })
 }
 
 pub fn encode_cursor(prefix: &[u8], last_key: &[u8]) -> Result<Vec<u8>, StorageError> {
@@ -1211,13 +1269,18 @@ mod tests {
     }
 
     #[test]
-    fn concurrent_nonce_reservations_are_disjoint() {
+    fn concurrent_nonce_reservations_are_disjoint_across_database_handles() {
         let file = path();
-        let store = Arc::new(RedbStore::open(&file).unwrap());
+        let initial = RedbStore::open(&file).unwrap();
+        drop(initial);
+
         let workers: Vec<_> = (0..12)
             .map(|_| {
-                let store = Arc::clone(&store);
-                thread::spawn(move || store.reserve(&key_id(), 3, nonce_config()).unwrap())
+                let file = file.clone();
+                thread::spawn(move || {
+                    let store = RedbStore::open(&file).unwrap();
+                    store.reserve(&key_id(), 3, nonce_config()).unwrap()
+                })
             })
             .collect();
         let mut blocks: Vec<_> = workers.into_iter().map(|w| w.join().unwrap()).collect();
@@ -1225,7 +1288,6 @@ mod tests {
         for pair in blocks.windows(2) {
             assert_eq!(pair[0].end_exclusive(), pair[1].start());
         }
-        drop(store);
         remove(&file);
     }
 
@@ -1270,17 +1332,51 @@ mod tests {
     }
 
     #[test]
+    fn delete_and_recreate_never_reuses_a_cas_version() {
+        let file = path();
+        let store = RedbStore::open(&file).unwrap();
+
+        assert_eq!(store.put(b"kv/aba", b"first").unwrap(), 1);
+        assert!(store.delete(b"kv/aba").unwrap());
+        assert!(store.get(b"kv/aba").unwrap().is_none());
+
+        assert_eq!(
+            store.compare_and_swap(b"kv/aba", Some(1), Some(b"stale")),
+            Err(StorageError::Conflict)
+        );
+
+        assert_eq!(
+            store.compare_and_swap(b"kv/aba", None, Some(b"recreated")).unwrap(),
+            Some(3)
+        );
+        assert_eq!(
+            store.compare_and_swap(b"kv/aba", Some(1), Some(b"stale-again")),
+            Err(StorageError::Conflict)
+        );
+        let live = store.get(b"kv/aba").unwrap().unwrap();
+        assert_eq!(live.version(), 3);
+        assert_eq!(live.value(), b"recreated");
+
+        drop(store);
+        remove(&file);
+    }
+
+    #[test]
     fn prefix_pagination_and_cursor_prefix_binding() {
         let file = path();
         let store = RedbStore::open(&file).unwrap();
         for key in [b"kv/a".as_slice(), b"kv/b", b"kv/c", b"other/a"] {
             store.put(key, key).unwrap();
         }
+        assert!(store.delete(b"kv/b").unwrap());
+        store.put(b"kv/d", b"kv/d").unwrap();
         let first = store.list(b"kv/", 2, None).unwrap();
         assert_eq!(first.records().len(), 2);
+        assert_eq!(first.records()[0].key(), b"kv/a");
+        assert_eq!(first.records()[1].key(), b"kv/c");
         let second = store.list(b"kv/", 2, first.next_cursor()).unwrap();
         assert_eq!(second.records().len(), 1);
-        assert_eq!(second.records()[0].key(), b"kv/c");
+        assert_eq!(second.records()[0].key(), b"kv/d");
         assert_eq!(
             store.list(b"other/", 2, first.next_cursor()),
             Err(StorageError::InvalidCursor)
@@ -1412,8 +1508,8 @@ mod tests {
 
         #[test]
         fn malformed_version_records_fail_closed(input in prop::collection::vec(any::<u8>(), 0..32)) {
-            if input.len() < 8 {
-                prop_assert_eq!(decode_versioned(&input), Err(StorageError::CorruptRecord));
+            if input.len() < 9 {
+                prop_assert_eq!(decode_versioned_record(&input), Err(StorageError::CorruptRecord));
             }
         }
     }
