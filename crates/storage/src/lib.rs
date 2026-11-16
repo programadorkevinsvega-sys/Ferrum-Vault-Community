@@ -240,11 +240,26 @@ impl RedbStore {
         // Create the complete schema atomically. Empty databases must support
         // reads/deletes before a caller's first put creates any records.
         drop(tx.open_table(KV).map_err(|_| StorageError::Unavailable)?);
-        drop(tx.open_table(BARRIER).map_err(|_| StorageError::Unavailable)?);
-        drop(tx.open_table(NONCES).map_err(|_| StorageError::Unavailable)?);
-        drop(tx.open_table(CHECKPOINTS).map_err(|_| StorageError::Unavailable)?);
-        drop(tx.open_table(AUDIT).map_err(|_| StorageError::Unavailable)?);
-        drop(tx.open_table(DEPENDENCIES).map_err(|_| StorageError::Unavailable)?);
+        drop(
+            tx.open_table(BARRIER)
+                .map_err(|_| StorageError::Unavailable)?,
+        );
+        drop(
+            tx.open_table(NONCES)
+                .map_err(|_| StorageError::Unavailable)?,
+        );
+        drop(
+            tx.open_table(CHECKPOINTS)
+                .map_err(|_| StorageError::Unavailable)?,
+        );
+        drop(
+            tx.open_table(AUDIT)
+                .map_err(|_| StorageError::Unavailable)?,
+        );
+        drop(
+            tx.open_table(DEPENDENCIES)
+                .map_err(|_| StorageError::Unavailable)?,
+        );
 
         let mut meta = tx.open_table(META).map_err(|_| StorageError::Unavailable)?;
         if meta
