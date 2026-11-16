@@ -1,6 +1,6 @@
 # Phase 2.0 — Owner decision register and contract baseline
 
-- **Status:** Draft prepared for owner review; **not approved and not complete**.
+- **Status:** In progress. D2.0-01 (dual HTTP/JSON + gRPC transports with one shared security pipeline) is owner-approved in [ADR-0025](../adr/0025-dual-api-transports-shared-security-pipeline.md); D2.0-02 through D2.0-11 remain pending. **Subphase 2.0 is not complete.**
 - **Scope:** Ferrum Vault Community only.
 - **Parent:** [ROADMAP Phase 2](../../ROADMAP.md#phase-2-native-api-authentication-authorization-and-audit).
 - **Purpose:** Give the owner a concrete, traceable decision surface for Phase 2.0. This register records approved constraints, candidate operations, contract boundaries and unresolved choices. It is not an ADR and does not approve any candidate choice by implication.
@@ -8,7 +8,7 @@
 ## 1. Decision-control rules
 
 1. Existing owner-approved ADR requirements remain binding. Phase 2.0 must apply them, not reopen or silently weaken them.
-2. Every option below is a candidate only. No protocol, schema, credential type, policy grammar, numeric limit, default, endpoint or audit algorithm is selected by this register.
+2. Only the transport decision explicitly recorded in ADR-0025 is approved: both HTTP/JSON and gRPC share one authoritative security pipeline. Other options below are candidates only; no schema tooling, credential type, policy grammar, numeric limit, default, endpoint or audit algorithm is selected by this register.
 3. An implementation-affecting choice becomes binding only after the owner approves a new ADR or a superseding ADR and that decision is merged into Community main.
 4. A feature with an unresolved decision must remain disabled or outside the approved scope. It must not gain a permissive fallback.
 5. Phase 2.0 is design and approval work. It does not authorize Phase 2.1–2.6 runtime implementation. Phase 0's explicit owner closeout gate remains visible in the roadmap until recorded.
@@ -17,6 +17,7 @@
 
 | Constraint | Binding requirement | Source |
 |---|---|---|
+| Native transports | Expose both HTTP/JSON and gRPC; transport adapters share one authoritative security pipeline and equivalent security semantics | [ADR-0025](../adr/0025-dual-api-transports-shared-security-pipeline.md) |
 | Request pipeline | Preserve the approved order: TLS 1.3 listener using rustls; HTTP/gRPC server and request ID; request size/time limits; IP pre-auth rate limit; local seal check; authentication; identity rate limit; canonical route/ACL; handler; durable audit before/after sensitive operations | [ADR-0005](../adr/0005-request-pipeline-and-fail-closed-audit.md) |
 | Fail-closed audit | If required audit intent cannot be persisted, do not perform the sensitive operation or disclose protected read data; configured sink failure blocks the operation | [ADR-0005](../adr/0005-request-pipeline-and-fail-closed-audit.md) |
 | Audit baseline | JSON file with hash-chain integrity and stdout/syslog are the minimum named destinations; retention is configurable with a 90-day default. Details not explicitly defined by ADR-0005 remain open | [ADR-0005](../adr/0005-request-pipeline-and-fail-closed-audit.md) |
@@ -75,23 +76,23 @@ The following categories must be populated for every selected operation before i
 
 ## 5. Owner-pending decision register
 
-All records are **Pending owner decision**. The alternatives are prompts for evaluation, not recommendations, defaults or commitments.
+D2.0-01 is **Owner-approved** in ADR-0025. D2.0-02 through D2.0-11 remain **Pending owner decision**. Remaining alternatives are prompts for evaluation, not recommendations, defaults or commitments.
 
 ### D2.0-01 — Transport and server implementation
 
-- **Required decision:** whether the native service exposes HTTP, gRPC or both in the Phase 2 MVP; the server implementation; protocol mapping.
-- **Candidate directions:** HTTP-only; gRPC-only; dual protocol with a shared request/security context.
-- **Must preserve:** TLS 1.3 via rustls and ADR-0005 pipeline order.
-- **Impact:** network surface, middleware integration, cancellation, request identity, client ecosystem, fuzz targets and operational complexity.
-- **Not selected:** framework, listener topology, protocol combination or middleware stack.
+- **Owner decision:** **APPROVED — HTTP/JSON and gRPC are both native Phase 2 MVP transports.** They must share one authoritative security pipeline and logical request/security context; transport adapters may only perform protocol-specific decoding/encoding and may not duplicate or weaken security controls.
+- **ADR:** [ADR-0025 — Dual native API transports with a shared security pipeline](../adr/0025-dual-api-transports-shared-security-pipeline.md).
+- **Must preserve:** TLS 1.3 via rustls, the exact ADR-0005 pipeline order and equivalent security semantics across both transports.
+- **Still open:** server/framework selection, listener topology, JSON schema/source-of-truth tooling, gRPC IDL/serialization tooling, cross-transport error mapping and operation-by-operation transport coverage.
+- **Approval date:** 2026-11-15.
 
 ### D2.0-02 — Wire/schema and error contract
 
-- **Required decision:** request/response encoding, schema source of truth, validation behavior and stable error envelope.
-- **Candidate directions:** JSON with a separately maintained schema; JSON with a generated schema contract; protobuf; another explicitly justified format.
-- **Must preserve:** typed errors internally, stable public /v1 compatibility and secret-safe error bodies.
+- **Required decision:** HTTP/JSON contract schema/source of truth, gRPC IDL/serialization schema and the mapping of validation/typed errors across the two transports.
+- **Candidate directions to evaluate:** separately maintained or generated HTTP/JSON schemas; a gRPC IDL and corresponding generation approach; an explicitly documented shared error taxonomy.
+- **Must preserve:** HTTP uses JSON representations, the native HTTP API follows /v1, internal typed errors remain stable and responses never disclose secrets.
 - **Impact:** API clients, compatibility tests, generated code, parser/fuzz scope and error disclosure.
-- **Not selected:** schema language, code generator, error field names or status mapping.
+- **Not selected:** schema language/tooling, gRPC IDL, code generator, exact error fields or HTTP/gRPC status mapping.
 
 ### D2.0-03 — Native endpoint and operation catalog
 
@@ -219,7 +220,7 @@ Complete one row per decision. A blank or "deferred" row is not approval; a depe
 
 | Decision ID | Owner selection / explicit exclusion | Rationale and trade-offs | ADR reference | Approval date |
 |---|---|---|---|---|
-| D2.0-01 | Pending | Pending | Pending | Pending |
+| D2.0-01 | HTTP/JSON + gRPC; one shared authoritative security pipeline | Two native access transports without duplicated/weaker security controls | [ADR-0025](../adr/0025-dual-api-transports-shared-security-pipeline.md) | 2026-11-15 |
 | D2.0-02 | Pending | Pending | Pending | Pending |
 | D2.0-03 | Pending | Pending | Pending | Pending |
 | D2.0-04 | Pending | Pending | Pending | Pending |
