@@ -282,6 +282,7 @@ impl RedbStore {
 
     /// Stores a structurally valid FBE1 envelope and updates live-key dependencies atomically.
     pub fn put_encrypted(&self, path: &CanonicalPath, envelope: &[u8]) -> Result<(), StorageError> {
+        validate_key(path.as_bytes())?;
         validate_value(envelope)?;
         BarrierEnvelope::decode(envelope).map_err(|_| StorageError::CorruptRecord)?;
         let tx = self.begin_write()?;
@@ -305,6 +306,7 @@ impl RedbStore {
     }
 
     pub fn delete_encrypted(&self, path: &CanonicalPath) -> Result<bool, StorageError> {
+        validate_key(path.as_bytes())?;
         let tx = self.begin_write()?;
         let records = tx
             .open_table(BARRIER)
@@ -701,7 +703,10 @@ impl NonceUsageLedger for RedbStore {
         let end = start
             .checked_add(block)
             .ok_or(NonceLedgerError::CounterExhausted)?;
-        if start == 0 || end > MAX_GCM_INVOCATIONS {
+        if start == 0 || end > MAX_GCM_INVOCATIONS || end - 1 > threshold {
+            // Do not advance the high-water mark for a block that cannot be
+            // issued under the immutable rotation policy. Repeated callers
+            // fail against the same durable state instead of burning blocks.
             return Err(NonceLedgerError::CounterExhausted);
         }
         let encoded = encode_nonce_state(end, block, threshold);
@@ -789,6 +794,7 @@ impl RotationStore for RedbStore {
         for entry in table.iter().map_err(|_| RotationStoreError::Unavailable)? {
             let (key, value) = entry.map_err(|_| RotationStoreError::Unavailable)?;
             let path_bytes = key.value();
+            validate_key(path_bytes).map_err(|_| RotationStoreError::CorruptState)?;
             if after.is_some_and(|cursor| path_bytes <= cursor) {
                 continue;
             }
@@ -814,7 +820,10 @@ impl RotationStore for RedbStore {
         success_event: RotationAuditEvent,
         conflict_event: RotationAuditEvent,
     ) -> Result<bool, RotationStoreError> {
-        if expected_envelope.is_empty()
+        if validate_key(path.as_bytes()).is_err()
+            || validate_value(expected_envelope).is_err()
+            || validate_value(replacement_envelope).is_err()
+            || expected_envelope.is_empty()
             || BarrierEnvelope::decode(replacement_envelope).is_err()
             || success_event.job_id() != conflict_event.job_id()
         {
@@ -1064,6 +1073,7 @@ fn is_live_dependency(key: &[u8]) -> bool {
 }
 
 fn live_dependency_key(envelope: &[u8], path: &[u8]) -> Result<Vec<u8>, StorageError> {
+    validate_key(path)?;
     let parsed = BarrierEnvelope::decode(envelope).map_err(|_| StorageError::CorruptRecord)?;
     let mut out = dependency_prefix(parsed.key_id().as_str(), parsed.key_version())?;
     out.push(0);
@@ -1264,6 +1274,78 @@ mod tests {
                 Err(NonceLedgerError::CorruptState)
             );
         }
+        remove(&file);
+    }
+
+    #[test]
+    fn nonce_ledger_refuses_block_past_rotation_threshold_without_advancing() {
+        let file = path();
+        let config =
+            NonceBudgetConfig::new(NonZeroU64::new(4).unwrap(), NonZeroU64::new(12).unwrap())
+                .unwrap();
+        let store = RedbStore::open(&file).unwrap();
+
+        for expected_start in [1, 5, 9] {
+            let reservation = store.reserve(&key_id(), 8, config).unwrap();
+            assert_eq!(reservation.start(), expected_start);
+            assert_eq!(reservation.end_exclusive(), expected_start + 4);
+        }
+        assert_eq!(
+            store.reserve(&key_id(), 8, config),
+            Err(NonceLedgerError::CounterExhausted)
+        );
+
+        let key = {
+            let id = key_id();
+            let bytes = id.as_str().as_bytes();
+            let mut key = Vec::with_capacity(2 + bytes.len() + 8);
+            key.extend_from_slice(&(bytes.len() as u16).to_be_bytes());
+            key.extend_from_slice(bytes);
+            key.extend_from_slice(&8_u64.to_be_bytes());
+            key
+        };
+        let high_water = {
+            let tx = store.database.begin_read().unwrap();
+            let table = tx.open_table(NONCES).unwrap();
+            let value = table.get(key.as_slice()).unwrap().unwrap();
+            decode_nonce_state(value.value()).unwrap().0
+        };
+        assert_eq!(high_water, 13);
+        assert_eq!(
+            store.reserve(&key_id(), 8, config),
+            Err(NonceLedgerError::CounterExhausted)
+        );
+        drop(store);
+
+        let reopened = RedbStore::open(&file).unwrap();
+        assert_eq!(
+            reopened.reserve(&key_id(), 8, config),
+            Err(NonceLedgerError::CounterExhausted)
+        );
+        let tx = reopened.database.begin_read().unwrap();
+        let table = tx.open_table(NONCES).unwrap();
+        let value = table.get(key.as_slice()).unwrap().unwrap();
+        assert_eq!(decode_nonce_state(value.value()).unwrap().0, 13);
+        drop(table);
+        drop(tx);
+        drop(reopened);
+        remove(&file);
+    }
+
+    #[test]
+    fn encrypted_records_enforce_max_key_length() {
+        let file = path();
+        let store = RedbStore::open(&file).unwrap();
+        let oversized = CanonicalPath::new(vec![b'x'; MAX_KEY_LEN + 1]).unwrap();
+        assert_eq!(
+            store.put_encrypted(&oversized, &envelope(1)),
+            Err(StorageError::InvalidInput)
+        );
+        assert_eq!(
+            store.delete_encrypted(&oversized),
+            Err(StorageError::InvalidInput)
+        );
+        drop(store);
         remove(&file);
     }
 
