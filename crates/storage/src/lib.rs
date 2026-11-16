@@ -266,9 +266,42 @@ impl RedbStore {
         Ok(removed)
     }
 
-    /// Administrative assertion after complete reconciliation of live records and external artifacts.
+    /// Rebuild the live-record dependency index and mark it complete in one
+    /// durable transaction. External backup/snapshot/job dependencies must
+    /// already have been registered by the caller before this assertion.
     pub fn confirm_inventory_reconciled(&self) -> Result<(), StorageError> {
         let tx = self.begin_write()?;
+
+        let mut live_dependencies = Vec::new();
+        let records = tx.open_table(BARRIER).map_err(|_| StorageError::Unavailable)?;
+        for entry in records.iter().map_err(|_| StorageError::Unavailable)? {
+            let (path, envelope) = entry.map_err(|_| StorageError::Unavailable)?;
+            live_dependencies.push(live_dependency_key(envelope.value(), path.value())?);
+        }
+        drop(records);
+
+        let dependencies = tx.open_table(DEPENDENCIES).map_err(|_| StorageError::Unavailable)?;
+        let stale_live: Vec<Vec<u8>> = dependencies
+            .iter()
+            .map_err(|_| StorageError::Unavailable)?
+            .filter_map(|entry| match entry {
+                Ok((key, _)) if is_live_dependency(key.value()) => Some(Ok(key.value().to_vec())),
+                Ok(_) => None,
+                Err(error) => Some(Err(error)),
+            })
+            .collect::<Result<_, _>>()
+            .map_err(|_| StorageError::Unavailable)?;
+        drop(dependencies);
+
+        let mut dependencies = tx.open_table(DEPENDENCIES).map_err(|_| StorageError::Unavailable)?;
+        for key in stale_live {
+            dependencies.remove(key.as_slice()).map_err(|_| StorageError::Unavailable)?;
+        }
+        for key in live_dependencies {
+            dependencies.insert(key.as_slice(), &[1_u8][..]).map_err(|_| StorageError::Unavailable)?;
+        }
+        drop(dependencies);
+
         let mut meta = tx.open_table(META).map_err(|_| StorageError::Unavailable)?;
         meta.insert(INVENTORY_COMPLETE, &[1_u8][..]).map_err(|_| StorageError::Unavailable)?;
         drop(meta);
@@ -641,6 +674,17 @@ fn external_dependency_key(
     out.extend_from_slice(resource);
     Ok(out)
 }
+fn is_live_dependency(key: &[u8]) -> bool {
+    if key.len() < 11 {
+        return false;
+    }
+    let id_len = u16::from_be_bytes([key[0], key[1]]) as usize;
+    let Some(kind_offset) = 2_usize.checked_add(id_len).and_then(|v| v.checked_add(8)) else {
+        return false;
+    };
+    key.get(kind_offset) == Some(&0)
+}
+
 fn live_dependency_key(envelope: &[u8], path: &[u8]) -> Result<Vec<u8>, StorageError> {
     let parsed = BarrierEnvelope::decode(envelope).map_err(|_| StorageError::CorruptRecord)?;
     let mut out = dependency_prefix(parsed.key_id().as_str(), parsed.key_version())?;
@@ -857,6 +901,30 @@ mod tests {
             assert_eq!(checkpoint.target_key_version(), 2);
             assert_eq!(checkpoint.cursor(), Some(b"kv/rotation".as_slice()));
             assert_eq!(store.audit_count().unwrap(), 2);
+        }
+        remove(&file);
+    }
+
+    #[test]
+    fn inventory_reconciliation_rebuilds_missing_live_index() {
+        let file = path();
+        {
+            let db = Builder::new()
+                .set_concurrency_mode(ConcurrencyMode::MultiWriter)
+                .create(&file)
+                .unwrap();
+            let tx = db.begin_write().unwrap();
+            tx.set_durability(Durability::Immediate).unwrap();
+            let mut table = tx.open_table(BARRIER).unwrap();
+            table.insert(b"kv/legacy".as_slice(), envelope(1).as_slice()).unwrap();
+            drop(table);
+            tx.commit().unwrap();
+        }
+        {
+            let store = RedbStore::open(&file).unwrap();
+            assert_eq!(store.has_dependencies(&key_id(), 1), Err(KeyInventoryError::Incomplete));
+            store.confirm_inventory_reconciled().unwrap();
+            assert!(store.has_dependencies(&key_id(), 1).unwrap());
         }
         remove(&file);
     }
