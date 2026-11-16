@@ -106,22 +106,23 @@ The MVP has no web UI. UI work is deferred and must use the same server/API and 
 
 PKI, KV v2/leases, Transit and encrypted Raft/HA remain in their separately approved roadmap phases. Community must not add Enterprise dependencies or publish Enterprise-only implementation details.
 
-## 10. Provenance gaps to close in Phase 2.0
+## 10. Detailed Community design selected under delegation
 
-The owner has stated that the Phase 2 architecture choices were already made. These are carryover and documentation-traceability tasks, not requests to select again. The pinned source baseline and the current Community ADR set establish the binding requirements above, but do not reproduce every low-level value in a directly transcribable route/configuration catalog.
+The source baseline and public ADRs establish the binding architecture, but they do not reproduce every low-level route, wire field, ACL grammar token, numerical limit, sealed endpoint or audit field. On 2026-11-16 the owner explicitly delegated selection of these missing details to the technical architect. The resulting Community-only choices are recorded in [service-contract.md](service-contract.md), [configuration-contract.md](configuration-contract.md), [OpenAPI 3.2.1](openapi.yaml), [Protocol Buffers IDL](../../proto/ferrum/v1/service.proto), the example [TOML configuration](../../examples/ferrum.phase2.example.toml), and ADRs [0026](../adr/0026-phase-2-native-service-contracts.md) through [0029](../adr/0029-phase-2-server-tls-and-configuration.md).
 
-Phase 2.0 must locate and reproduce the previously approved values for the following items before implementation relies on them:
+These are **new delegated technical selections**, not details claimed to have existed in the original source snapshot and not retroactively attributed to earlier ADR approval dates. They preserve all higher-priority owner-approved decisions:
 
-- Exact native HTTP route names, methods, request/response schemas, gRPC service/RPC names and cross-transport error mapping.
-- Per-method authentication-material formats, server-side persistence/validation rules, principal attributes and lifecycle durations beyond the one-time bootstrap and stated protections.
-- The full ACL grammar, capability vocabulary and rule precedence.
-- Numerical request limits, rate-limit algorithms/quotas/windows/bursts and trusted-proxy configuration.
-- Exact sealed-mode endpoint and response-field allowlist.
-- TLS certificate provisioning, trust roots, rotation and reload lifecycle.
-- Canonical audit event schema, hash-chain construction parameters, append durability and approved rotation/archive behavior.
-- Exact outbox schema, idempotency key rules, recovery/reconciliation transitions, service configuration source, health/readiness fields and graceful shutdown contract.
+- Both HTTP/JSON and gRPC remain required and share one security pipeline.
+- `/v1`, semantic versioning and the two-minor deprecation policy remain unchanged.
+- The approved authentication method set remains token, AppRole, mTLS and username/password with Argon2id; OIDC, Kubernetes auth and LDAP remain excluded.
+- Community remains single-tenant with trusted server-side tenant `root`.
+- Shamir 2-of-3 remains the mandatory default Unsealer; root operations retain their independent explicit 2-of-3 quorum; AWS KMS remains optional and disabled by default without fallback.
+- ADR-0005's ordered pipeline, fail-closed audit, 90-day default retention and minimum audit destinations remain binding.
+- Phase boundaries and Community/Enterprise separation remain unchanged.
 
-No value above may be guessed from common practice, Vault compatibility or a new implementation preference. An absent detail in the abridged public ADR is not a reason to reopen an owner-approved decision. Keep Phase 2.0 in progress until the authoritative approved value is transcribed and its Community scope reviewed. Publish only Community-applicable content; do not copy private-edition material.
+The service contract fixes the precise route/RPC inventory, shared schemas and errors, credential representation/lifetimes, ACL grammar and precedence, resource/rate limits, sealed-mode allowlist, TLS certificate lifecycle, audit event/hash/outbox/idempotency behavior, strict configuration, clock handling and shutdown semantics. The configuration contract and synthetic TOML example provide the selected defaults. A conflict with a higher-priority approved ADR means the ADR wins and implementation must stop until the conflict is resolved.
+
+No Phase 2 runtime implementation is authorized until Phase 2.0 has passed contract validation and the owner accepts the phase report. No Enterprise-only information is to be copied into these public records.
 
 ## 11. Verification requirements
 
