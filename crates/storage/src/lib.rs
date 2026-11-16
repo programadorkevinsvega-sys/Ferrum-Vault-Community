@@ -858,7 +858,6 @@ mod tests {
             assert_eq!(checkpoint.cursor(), Some(b"kv/rotation".as_slice()));
             assert_eq!(store.audit_count().unwrap(), 2);
         }
-        drop(record_path);
         remove(&file);
     }
 
