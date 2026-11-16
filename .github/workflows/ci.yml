@@ -182,7 +182,7 @@ jobs:
         with:
           persist-credentials: false
       - name: Install pinned Rust toolchain
-        run: rustup toolchain install 1.100.0 --profile minimal
+        run: rustup toolchain install 1.100.0 --profile minimal --component rustfmt
       - name: Test KMS adapter with in-memory fake only
         run: cargo +1.100.0 test --locked -p ferrum-seal --features aws-kms
       - name: Compile official AWS SDK live example without credentials
@@ -231,12 +231,13 @@ jobs:
           set -euo pipefail
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add Cargo.lock fuzz/Cargo.lock
+          cargo +1.100.0 fmt --all
+          git add -u -- '*.rs' Cargo.lock fuzz/Cargo.lock
           if git diff --cached --quiet; then
             echo "Both committed lockfiles already contain the optional AWS SDK resolution."
             exit 0
           fi
-          git commit -m "chore(deps): lock optional AWS SDK for Rust"
+          git commit -m "chore(repo): format Rust sources and lock optional dependencies"
           git push origin "HEAD:${PR_HEAD_BRANCH}"
           gh workflow run ci.yml --ref "${PR_HEAD_BRANCH}"
           gh workflow run secret-scan.yml --ref "${PR_HEAD_BRANCH}"
