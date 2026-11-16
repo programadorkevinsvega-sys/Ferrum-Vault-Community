@@ -323,7 +323,7 @@ impl RedbStore {
     pub fn put_encrypted(&self, path: &CanonicalPath, envelope: &[u8]) -> Result<(), StorageError> {
         validate_key(path.as_bytes())?;
         validate_value(envelope)?;
-        BarrierEnvelope::decode(envelope).map_err(|_| StorageError::CorruptRecord)?;
+        let parsed = BarrierEnvelope::decode(envelope).map_err(|_| StorageError::CorruptRecord)?;
         let tx = self.begin_write()?;
         ensure_key_version_not_retired(&tx, parsed.key_id().as_str(), parsed.key_version())?;
         let records = tx
