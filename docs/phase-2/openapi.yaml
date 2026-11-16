@@ -201,10 +201,13 @@ paths:
         - $ref: '#/components/parameters/IdempotencyKey'
       responses:
         '200':
-          description: Old token revoked; new token returned once.
+          description: First call returns the rotated token once; an idempotent replay returns only a non-secret receipt.
           content:
             application/json:
-              schema: { $ref: '#/components/schemas/TokenResponse' }
+              schema:
+                oneOf:
+                  - $ref: '#/components/schemas/TokenResponse'
+                  - $ref: '#/components/schemas/TokenReplayReceipt'
         '401': { $ref: '#/components/responses/Unauthorized' }
         '409': { $ref: '#/components/responses/Conflict' }
   /v1/auth/token/revoke-self:
@@ -234,6 +237,11 @@ paths:
           content:
             application/json:
               schema: { $ref: '#/components/schemas/TokenResponse' }
+        '200':
+          description: Idempotent replay receipt; token secret is omitted and may not be recovered. Use the accessor to revoke it if the original secret was not received.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/TokenReplayReceipt' }
         '400': { $ref: '#/components/responses/BadRequest' }
         '401': { $ref: '#/components/responses/Unauthorized' }
         '403': { $ref: '#/components/responses/Forbidden' }
@@ -437,10 +445,15 @@ paths:
             schema: { $ref: '#/components/schemas/CreateSecretIdRequest' }
       responses:
         '201':
-          description: Secret ID shown exactly once.
+          description: Newly issued Secret ID secret; shown exactly once with a non-secret accessor.
           content:
             application/json:
               schema: { $ref: '#/components/schemas/SecretIdResponse' }
+        '200':
+          description: Idempotent replay receipt; Secret ID secret is omitted. Use the accessor to revoke it if the original secret was not received.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/SecretIdReplayReceipt' }
         '401': { $ref: '#/components/responses/Unauthorized' }
         '403': { $ref: '#/components/responses/Forbidden' }
         '404': { $ref: '#/components/responses/NotFound' }
@@ -830,6 +843,19 @@ components:
               items: { type: string }
           additionalProperties: false
       additionalProperties: false
+    TokenReplayReceipt:
+      type: object
+      required: [accessor, expiresAt, renewable, principalId, policies, replayed]
+      properties:
+        accessor: { type: string, minLength: 22, maxLength: 22 }
+        expiresAt: { type: string, format: date-time }
+        renewable: { type: boolean }
+        principalId: { type: string, format: uuid }
+        policies:
+          type: array
+          items: { type: string }
+        replayed: { type: boolean, const: true }
+      additionalProperties: false
     TokenMetadata:
       type: object
       required: [accessor, principalId, expiresAt, renewable, policies]
@@ -944,6 +970,15 @@ components:
         accessor: { type: string, minLength: 22, maxLength: 22, pattern: '^[A-Za-z0-9_-]{22}$' }
         expiresAt: { type: string, format: date-time }
         uses: { type: integer, minimum: 1, maximum: 10 }
+      additionalProperties: false
+    SecretIdReplayReceipt:
+      type: object
+      required: [accessor, expiresAt, uses, replayed]
+      properties:
+        accessor: { type: string, minLength: 22, maxLength: 22, pattern: '^[A-Za-z0-9_-]{22}$' }
+        expiresAt: { type: string, format: date-time }
+        uses: { type: integer, minimum: 1, maximum: 10 }
+        replayed: { type: boolean, const: true }
       additionalProperties: false
     AclRule:
       type: object
