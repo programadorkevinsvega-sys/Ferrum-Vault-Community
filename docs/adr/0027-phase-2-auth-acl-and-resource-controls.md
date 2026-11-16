@@ -12,13 +12,13 @@
 - Use opaque 256-bit CSPRNG bearer tokens with prefix `fvct_`; return the secret once and store only its domain-separated SHA-256 digest. Do not use self-contained JWTs in Phase 2.
 - Default token TTL is 15 minutes, standard absolute maximum 8 hours. Privileged tokens default to 5 minutes, maximum 15 minutes and are non-renewable. Renewal rotates the secret and atomically revokes the old token. No orphan tokens or policy escalation.
 - Username/password uses Argon2id v=19, 64 MiB memory, 3 iterations, 4 lanes, 16-byte random salt and 32-byte output. This is RFC 9106's second recommended profile for much lower memory budgets; it is selected to bound Community server memory consumption, not claimed as the highest-memory profile. Hashes are protected at rest. Hash concurrency is bounded to 4 with a queue of 8.
-- AppRole role IDs are public 128-bit identifiers; Secret IDs are 256-bit one-time secrets, stored only as digests. Secret ID default TTL is 24 hours, maximum 30 days; default use count 1, maximum 10; unlimited-use IDs are prohibited. Role token TTL defaults to 15 minutes and is capped at 1 hour.
+- AppRole role IDs are public 128-bit identifiers; Secret IDs are 256-bit one-time secrets, stored only as domain-separated SHA-256 digests. Each Secret ID has a separate non-secret 128-bit accessor and immediate revoke-by-accessor endpoint. Secret ID default TTL is 24 hours, maximum 30 days; default use count 1, maximum 10; unlimited-use IDs are prohibited. Role token TTL defaults to 15 minutes and is capped at 1 hour. Idempotency replay returns accessor/expiry/use-count receipt only, never the secret.
 - Bootstrap tokens are generated out-of-band, 256-bit, single-use and valid for 5 minutes. The resulting setup token is also single-use/5-minute and limited to creating the first password identity and initial ACL policy.
 - mTLS identity requires a valid clientAuth certificate chain, exact URI SAN-to-principal mapping and active revocation material. CN fallback and proxy-supplied certificate identity headers are forbidden.
 
 ### ACL
 
-- Use a versioned JSON policy schema with fixed fields `version`, `rules`, `effect`, `resource` and `actions`. Do not embed a scripting language.
+- Use a versioned JSON policy schema with fixed fields `version`, `rules`, `effect`, `resource` and `actions`. Do not embed a scripting language. `manage` is an exact independent action and does not imply `read`, `list` or `execute`; each permission is explicit.
 - Action vocabulary is fixed: `read`, `create`, `update`, `delete`, `list`, `execute`, `manage`.
 - Resource patterns use literal canonical segments, `*` for exactly one segment and terminal `**` for trailing segments. No regex, interpolation, arbitrary conditions or action wildcard in v1.
 - Deny-by-default; any matching deny overrides any allow. Missing, malformed, stale, unavailable or indeterminate policy state denies.
