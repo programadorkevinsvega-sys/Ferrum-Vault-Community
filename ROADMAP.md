@@ -14,7 +14,7 @@ This roadmap describes the public Community edition. It records approved design 
 |---|---|---|
 | 0 | Foundations | Public architecture, threat boundaries, decision records, workspace plan, governance and CI baseline |
 | 1 | Seal and encrypted storage | Cryptographic boundary, seal lifecycle, key hierarchy, barrier encryption, recovery and encrypted persistence |
-| 2 | [Native API, authentication, authorization and audit](#phase-2--native-api-authentication-authorization-and-audit) | Versioned `/v1` service, ordered TLS request pipeline, authentication, deny-by-default ACL and durable fail-closed audit |
+| 2 | [Native API, authentication, authorization and audit](#phase-2-native-api-authentication-authorization-and-audit) | Versioned `/v1` service, ordered TLS request pipeline, authentication, deny-by-default ACL and durable fail-closed audit |
 | 3 | PKI engine | Certificate authority workflows, issuance, revocation and interoperability |
 | 4 | KV v2 and leases | Versioned key/value storage, concurrency controls and lease lifecycle |
 | 5 | Transit | Encryption, decryption, signing, verification, HMAC and key lifecycle services |
@@ -171,6 +171,8 @@ Subphase dependencies are sequential where security decisions require it: 2.0 pr
 ### 2.3 Subphases and their Definition of Done
 
 #### 2.0 — Owner decisions and API/security contract baseline
+
+**Decision register:** [Phase 2.0 owner decision register and contract baseline](docs/phase-2/decision-register.md). It records binding ADR constraints, a candidate operation inventory, route-security classification, logical interfaces, threat impacts, test mapping and the owner-pending choices D2.0-01 through D2.0-11. The document is a review worksheet, not an ADR; none of its candidate choices is approved by implication. **Current state: prepared for owner review; 2.0 remains open until the required owner decisions are recorded.**
 
 **Scope:** resolve the owner-pending choices in §2.5; inventory the native endpoints and operations that Phase 2 will expose; classify each route by seal availability, authentication, authorization and audit requirements; record the resulting public interfaces and threat-model impact in ADRs. This is a design and approval gate, not permission to invent implementation defaults.
 
