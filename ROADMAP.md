@@ -172,7 +172,7 @@ Subphase dependencies are sequential where security decisions require it: 2.0 pr
 
 #### 2.0 — Owner decisions and API/security contract baseline
 
-**Decision register:** [Phase 2.0 owner decision register and contract baseline](docs/phase-2/decision-register.md). It records binding ADR constraints, a candidate operation inventory, route-security classification, logical interfaces, threat impacts, test mapping and the owner-pending choices D2.0-01 through D2.0-11. The document is a review worksheet, not an ADR; none of its candidate choices is approved by implication. **Current state: prepared for owner review; 2.0 remains open until the required owner decisions are recorded.**
+**Decision register:** [Phase 2.0 owner decision register and contract baseline](docs/phase-2/decision-register.md). It records binding ADR constraints, a candidate operation inventory, route-security classification, logical interfaces, threat impacts, test mapping and owner decisions D2.0-01 through D2.0-11. D2.0-01 is approved in [ADR-0025](docs/adr/0025-dual-api-transports-shared-security-pipeline.md): HTTP/JSON and gRPC share one authoritative security pipeline. The remaining D2.0 choices are pending. The register is a review worksheet, not an ADR. **Current state: in progress; 2.0 remains open until the remaining required decisions are recorded or explicitly deferred.**
 
 **Scope:** resolve the owner-pending choices in §2.5; inventory the native endpoints and operations that Phase 2 will expose; classify each route by seal availability, authentication, authorization and audit requirements; record the resulting public interfaces and threat-model impact in ADRs. This is a design and approval gate, not permission to invent implementation defaults.
 
@@ -196,7 +196,7 @@ Subphase dependencies are sequential where security decisions require it: 2.0 pr
 
 #### 2.2 — TLS server and ordered request pipeline
 
-**Scope:** provide the server listener and approved HTTP/gRPC transport, TLS 1.3 via rustls, request IDs, bounded request size/time, IP-based pre-authentication rate limiting, seal-state gating and the explicitly approved minimal allowlist for non-sensitive sealed-mode endpoints. Preserve ADR-0005's order; middleware must not reorder or bypass security gates.
+**Scope:** provide both approved native transports, HTTP/JSON and gRPC, through a shared authoritative security pipeline per [ADR-0025](docs/adr/0025-dual-api-transports-shared-security-pipeline.md); use TLS 1.3 via rustls, request IDs, bounded request size/time, IP-based pre-authentication rate limiting, seal-state gating and the explicitly approved minimal allowlist for non-sensitive sealed-mode endpoints. Preserve ADR-0005's order; middleware must not reorder or bypass security gates.
 
 **Definition of Done:**
 - The selected transport starts with TLS 1.3 and rejects invalid/untrusted transport configuration according to the approved configuration contract.
@@ -306,7 +306,7 @@ Phase 2 is complete only when all of the following are true and the owner accept
 
 1. The Phase 2 entry gates are satisfied and every implementation-affecting owner decision is resolved in an ADR or explicitly excluded with its dependent feature disabled.
 2. The documented native `/v1` API catalog and schemas match the running service; semantic versioning and the two-minor deprecation policy are enforced by contract tests.
-3. The actual service enforces the full ADR-0005 pipeline in the approved order, using TLS 1.3/rustls and the approved transport(s).
+3. The actual service enforces the full ADR-0005 pipeline in the approved order, using TLS 1.3/rustls and both approved native transports (HTTP/JSON and gRPC) through the shared pipeline.
 4. Request limits, pre-auth IP rate limiting, sealed-mode gating, authentication, identity-based rate limiting and canonical ACL checks cannot be bypassed or silently skipped.
 5. Authorization is deny-by-default; Community remains single-tenant with tenant `root` derived from trusted server context.
 6. Required audit intent is durable before sensitive operations or secret disclosure, outcomes are durably recorded afterward, and sink failures block the operation. Audit chain verification, retention and recovery behavior are evidenced within the documented threat boundary.
