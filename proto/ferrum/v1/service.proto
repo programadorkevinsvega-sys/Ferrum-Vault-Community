@@ -84,11 +84,11 @@ message SealStatus {
 }
 
 message BootstrapConsumeRequest {
-  bytes bootstrap_token = 1;
+  bytes bootstrap_token = 1; // Raw 32-byte secret; HTTP encoding adds the fvbt_ prefix.
 }
 
 message BootstrapConsumeResponse {
-  bytes bootstrap_token = 1; // Write-only, single-use 5-minute setup token.
+  bytes bootstrap_token = 1; // Raw 32-byte setup token; HTTP encoding adds fvbt_. Single-use, 5-minute.
   google.protobuf.Timestamp expires_at = 2;
   repeated string capabilities = 3;
 }
@@ -109,8 +109,8 @@ message ShareProgress {
     IN_PROGRESS = 1;
     COMPLETED = 2;
   }
-  Status status = 1;
-  uint32 threshold = 2;
+  Status status = 1; // Never reports submitted-share count or participant identity.
+  uint32 threshold = 2; // Fixed 2-of-3 threshold.
 }
 
 message PasswordLoginRequest {
@@ -119,12 +119,12 @@ message PasswordLoginRequest {
 }
 
 message AppRoleLoginRequest {
-  string role_id = 1;
-  string secret_id = 2;
+  string role_id = 1; // 128-bit public ID encoded as unpadded base64url.
+  string secret_id = 2; // fvsa_ prefix plus 32 random bytes encoded as unpadded base64url.
 }
 
 message TokenAuth {
-  string client_token = 1; // Returned once; never persisted in plaintext.
+  string client_token = 1; // fvct_ prefix plus 32 random bytes encoded as unpadded base64url; never persisted in plaintext.
   string accessor = 2;
   string token_type = 3;
   google.protobuf.Timestamp expires_at = 4;
@@ -232,7 +232,7 @@ message CreateSecretIdRequest {
 }
 
 message SecretIdResponse {
-  string secret_id = 1; // Returned once.
+  string secret_id = 1; // fvsa_ prefix plus 32 random bytes encoded as unpadded base64url; returned once.
   google.protobuf.Timestamp expires_at = 2;
   uint32 uses = 3;
 }
@@ -302,7 +302,7 @@ message GetRootOperationRequest {
 
 message ApproveRootOperationRequest {
   string operation_id = 1;
-  bytes share = 2; // One distinct root-quorum FRS1 share; never logged/persisted.
+  bytes share = 2; // One FRS1 share from a distinct participant and distinct authenticated principal; never logged/persisted.
 }
 
 message RootOperation {
@@ -319,7 +319,7 @@ message RootOperation {
   BeginRootOperationRequest.Operation operation = 2;
   Status status = 3;
   google.protobuf.Timestamp expires_at = 4;
-  uint32 threshold = 5;
+  uint32 threshold = 5; // Fixed 2-of-3; no approvals count is disclosed.
 }
 
 message AuditStatus {
