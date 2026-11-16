@@ -1207,6 +1207,7 @@ mod tests {
     use ferrum_crypto::barrier::{RotationAuditEvent, RotationAuditKind};
     use proptest::prelude::*;
     use std::num::NonZeroU64;
+    use std::process::Command;
     use std::sync::atomic::{AtomicU64, Ordering};
     use std::thread;
 
@@ -1285,6 +1286,68 @@ mod tests {
         blocks.sort_by_key(NonceReservation::start);
         for pair in blocks.windows(2) {
             assert_eq!(pair[0].end_exclusive(), pair[1].start());
+        }
+        remove(&file);
+    }
+
+    #[test]
+    #[ignore = "invoked as a subprocess by nonce_reservations_are_disjoint_across_processes"]
+    fn nonce_reservation_child_process() {
+        let database = std::env::var_os("FERRUM_REDB_CHILD_DATABASE")
+            .expect("parent test provides a database path");
+        let store = RedbStore::open(database).unwrap();
+        let reservation = store.reserve(&key_id(), 77, nonce_config()).unwrap();
+        println!(
+            "FERRUM_NONCE_RESERVATION={}:{}",
+            reservation.start(),
+            reservation.end_exclusive()
+        );
+    }
+
+    #[test]
+    fn nonce_reservations_are_disjoint_across_processes() {
+        let file = path();
+        let initial = RedbStore::open(&file).unwrap();
+        drop(initial);
+
+        let executable = std::env::current_exe().unwrap();
+        let children: Vec<_> = (0..8)
+            .map(|_| {
+                Command::new(&executable)
+                    .arg("--exact")
+                    .arg("tests::nonce_reservation_child_process")
+                    .arg("--ignored")
+                    .arg("--nocapture")
+                    .env("FERRUM_REDB_CHILD_DATABASE", &file)
+                    .spawn()
+                    .unwrap()
+            })
+            .collect();
+
+        let mut reservations = Vec::with_capacity(children.len());
+        for child in children {
+            let output = child.wait_with_output().unwrap();
+            assert!(
+                output.status.success(),
+                "child process failed; stdout={} stderr={}",
+                String::from_utf8_lossy(&output.stdout),
+                String::from_utf8_lossy(&output.stderr)
+            );
+            let marker = String::from_utf8_lossy(&output.stdout)
+                .lines()
+                .find_map(|line| line.split_once("FERRUM_NONCE_RESERVATION="))
+                .map(|(_, value)| value)
+                .expect("child prints its reservation");
+            let (start, end) = marker.split_once(':').expect("reservation has two bounds");
+            reservations.push((
+                start.parse::<u64>().unwrap(),
+                end.parse::<u64>().unwrap(),
+            ));
+        }
+
+        reservations.sort_unstable_by_key(|reservation| reservation.0);
+        for pair in reservations.windows(2) {
+            assert_eq!(pair[0].1, pair[1].0);
         }
         remove(&file);
     }
