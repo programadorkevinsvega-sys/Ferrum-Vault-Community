@@ -170,7 +170,7 @@ Subphase dependencies are sequential where security decisions require it: 2.0 pr
 
 ### 2.3 Subphases and their Definition of Done
 
-#### 2.0 — Owner decisions and API/security contract baseline
+#### 2.0 — Approved-design carryover and delegated API/security contract baseline
 
 **Decision register and detailed contracts:** [Phase 2.0 decision register](docs/phase-2/decision-register.md) and [approved Community design carryover](docs/phase-2/approved-design-carryover.md) preserve the owner-approved architecture. The detailed implementation defaults explicitly delegated on 2026-11-16 are recorded in [service-contract.md](docs/phase-2/service-contract.md), [configuration-contract.md](docs/phase-2/configuration-contract.md), [OpenAPI 3.2.1](docs/phase-2/openapi.yaml), [proto3 IDL](proto/ferrum/v1/service.proto) and ADR-0026–0029. They define exact operations/routes, wire schemas, shared error semantics, credentials, ACL grammar, rate/resource limits, sealed-mode access, TLS/configuration, audit/outbox/idempotency and lifecycle behavior. **Subphase 2.0 is a documentation/contract validation and acceptance gate, not a fresh architecture questionnaire.**
 
@@ -203,7 +203,7 @@ Subphase dependencies are sequential where security decisions require it: 2.0 pr
 - The selected transport starts with TLS 1.3 and rejects invalid/untrusted transport configuration according to the approved configuration contract.
 - Each request receives a server-generated request ID and bounded resource/deadline context.
 - The order of all pipeline stages is verified by integration tests, including early rejection paths.
-- IP-based pre-authentication rate limiting uses only the owner-approved client-address/trusted-proxy rules; spoofable client headers are not trusted by default.
+- IP-based pre-authentication rate limiting uses the trusted socket peer by default and only explicitly configured proxy CIDRs/RFC 7239 `Forwarded` handling from ADR-0027/0029; spoofable headers are never authoritative.
 - Sealed-mode behavior is deny-by-default except for the explicit approved allowlist.
 - Cancellation, timeout and connection termination leave state and resources consistent; applicable concurrency/failure tests are included.
 
@@ -212,7 +212,7 @@ Subphase dependencies are sequential where security decisions require it: 2.0 pr
 **Scope:** implement the owner-approved MVP methods using the credential and lifecycle details selected in [ADR-0027](docs/adr/0027-phase-2-auth-acl-and-resource-controls.md): token, AppRole, mTLS client certificate, and username/password with Argon2id. OIDC, Kubernetes authentication and LDAP remain deferred. Identity is server-owned; post-auth identity limits apply. Dynamic extensions retain ADR-0002's async + `Send + Sync` contract and cancellation/error/concurrency requirements.
 
 **Definition of Done:**
-- The four approved MVP methods (token, AppRole, mTLS client certificate and username/password with Argon2id) implement the credential validation and identity lifecycle specified in the owner-approved contracts. Bootstrap token issuance is one-time; approved expiry, renewal, revocation and replay protections are preserved. OIDC, Kubernetes authentication and LDAP are not enabled in the MVP.
+- The four owner-approved MVP methods (token, AppRole, mTLS client certificate and username/password with Argon2id) implement the credential and lifecycle details selected under delegation in ADR-0027 and the Phase 2 service contract. Bootstrap token issuance is one-time; approved expiry, renewal, revocation and replay protections are preserved. OIDC, Kubernetes authentication and LDAP are not enabled in the MVP.
 - Unauthenticated, malformed, expired, revoked, replayed and otherwise invalid credentials fail closed and do not reach protected handlers.
 - Identity is produced by the authentication boundary; client-supplied identity or tenant fields cannot override it.
 - Identity-based rate limiting is enforced after successful authentication.
@@ -226,7 +226,7 @@ Subphase dependencies are sequential where security decisions require it: 2.0 pr
 **Definition of Done:**
 - Every protected route is covered by an explicit policy decision; missing, malformed, unavailable or indeterminate policy state denies access.
 - Route canonicalization occurs before policy evaluation and is consistent between routing, authorization and audit.
-- Tests cover path aliases, encoding/normalization edge cases, method/action confusion, policy absence, conflicting rules and attempted privilege escalation according to the approved policy semantics.
+- Tests cover path aliases, encoding/normalization edge cases, method/action confusion, policy absence, conflicting rules and attempted privilege escalation according to the ACL grammar and semantics specified in delegated ADR-0027 and the Phase 2 service contract.
 - The authenticated identity and `root` tenant context are derived server-side.
 - Authorization decisions are explainable through non-secret diagnostics/audit references without disclosing credentials or protected values.
 
@@ -235,7 +235,7 @@ Subphase dependencies are sequential where security decisions require it: 2.0 pr
 **Scope:** implement ADR-0005 using the detailed event/hash-chain/outbox/idempotency/reconciliation contract in [ADR-0028](docs/adr/0028-phase-2-durable-audit-and-outbox.md). Keep the minimum JSON hash-chain file plus stdout/syslog destinations and 90-day default. Intent remains durable before sensitive side effects or protected disclosure; failures block the operation.
 
 **Definition of Done:**
-- Audit event schema, canonical serialization, hash-chain construction/verification, append/concurrency behavior, sink configuration and retention enforcement match owner-approved decisions.
+- Audit event schema, canonical serialization, hash-chain construction/verification, append/concurrency behavior, sink configuration and retention enforcement preserve ADR-0005 and implement the detailed contract selected in delegated ADR-0028.
 - Required intent is durably recorded before a sensitive mutation or secret disclosure; outcome is durably recorded afterward.
 - Sink failure, partial write, process interruption, retry and recovery tests prove fail-closed behavior and do not silently lose or duplicate security-relevant outcomes.
 - When a single transaction cannot cover audit and state, the approved outbox/idempotency/reconciliation contract is implemented and tested.
@@ -261,32 +261,34 @@ The following required boundaries are normatively specified by service-contract.
 
 | Boundary | Required contract |
 |---|---|
-| Listener and transport | TLS 1.3/rustls termination, approved HTTP/gRPC protocol(s), request lifecycle, connection failure and cancellation behavior |
+| Listener and transport | Single TLS 1.3/rustls listener for HTTP/JSON + gRPC, ALPN `h2`/`http/1.1`, no plaintext or 0-RTT, request lifecycle and cancellation (ADR-0026/0029) |
 | Request context | Server-generated request ID, trusted peer/client-address context, deadline and size bounds, seal state, authenticated principal when available, canonical route/action and Community tenant `root` |
 | API handler | Versioned request/response contract, typed error behavior, no bypass around pipeline controls |
 | Authentication extension | Credential validation, trusted identity production, typed failure behavior, cancellation and concurrency guarantees; dynamic plugins follow ADR-0002 |
-| Rate limiting | Separate pre-auth IP and post-auth identity boundaries, with source-of-client-address and shared/process scope explicitly decided |
+| Rate limiting | Separate pre-auth socket-peer IP and post-auth identity buckets; trusted proxy CIDRs and bounded RFC 7239 parsing; mandatory limits/fail-closed backend (ADR-0027) |
 | Authorization | Canonical resource/action + trusted identity → explicit allow/deny; unavailable or indeterminate state denies |
 | Audit sink | Durable intent/outcome append and verification contract, sink failure semantics, cancellation behavior, and no secret disclosure |
-| Configuration | Validated startup configuration; unsafe or incomplete required security configuration fails closed; defaults exist only where approved |
+| Configuration | Strict TOML with safe defaults and explicit required root 2-of-3 quorum; invalid/unsafe settings fail startup or disable the affected capability closed (ADR-0029) |
 
-### 2.5 Reconciliation of already approved Phase 2 decisions
+### 2.5 Provenance and delegated decision control
 
-**Important:** the Community ADRs are concise adaptations of the owner-approved source architecture, as documented in [SOURCE-MAP.md](docs/adr/SOURCE-MAP.md). Their shorter wording is not a new decision and is not evidence that a corresponding detail was undecided. The owner has confirmed that the Phase 2 choices listed below were already made. The implementation team must carry them into the Community contracts and must not ask the owner to select them again, silently substitute alternatives or invent values.
+The [SOURCE-MAP](docs/adr/SOURCE-MAP.md) explains which Community ADRs carry forward the owner's original architecture. The abbreviated source records establish the binding high-level decisions; they do not contain all the detailed values and API catalog fields that this Phase 2 contract now specifies.
 
-1. **Transport and server:** carry forward the approved HTTP/JSON + gRPC model through a shared security pipeline, TLS 1.3/rustls and the established request ordering (ADR-0005 and ADR-0025). Carry over the approved server/framework, listener and protocol mapping choices.
-2. **Native API catalog and wire contracts:** reproduce the already approved Phase 2 resources, routes, methods, schemas, pagination and error semantics. Do not draft a different MVP endpoint list.
-3. **Authentication and identity:** reproduce the owner-approved authentication methods, principal/identity model, credential format and storage, issuance/bootstrap authority, lifetime, renewal, revocation, rotation and replay behavior. Preserve ADR-0002's dynamic extension contract. The optional Vault compatibility surface remains later under ADR-0018.
-4. **Authorization:** reproduce the approved ACL grammar, resources/actions, canonicalization, matching/precedence, policy lifecycle, administrative bootstrap and lockout recovery. Preserve deny-by-default and Community tenant root from trusted server context.
-5. **Rate limiting and request bounds:** reproduce the approved algorithms, quotas/windows/bursts, source identity, trusted-proxy rules, request sizes/timeouts and failure behavior. ADR-0005's pre-auth IP and post-auth identity gates remain mandatory.
-6. **Sealed-mode allowlist:** reproduce the exact approved endpoint and response-field allowlist; do not broaden it.
-7. **TLS certificate lifecycle:** reproduce the approved certificate/key provisioning, trust roots, rotation and reload choices while preserving TLS 1.3/rustls.
-8. **Audit:** reproduce the approved event schema, hash-chain parameters, append durability, sinks, retention, rotation/archive and verification rules while preserving ADR-0005's minimum JSON hash-chain file plus stdout/syslog, 90-day configurable default and fail-closed semantics.
-9. **Audit/state coordination:** reproduce the approved transaction boundary, outbox, idempotency and reconciliation/recovery design.
-10. **Service operations:** reproduce the approved configuration source/format, secret handling, startup validation, health/readiness, graceful shutdown and deployment assumptions, including the existing server distribution requirements in ADR-0022. Preserve the ADR-0014 time model: monotonic time for durations, wall-clock time for certificate validity, and documented clock-drift/NTP alert behavior in the relevant phase.
-11. **CLI distribution:** preserve ADR-0023's Phase 2 archive targets and release-verification requirements; do not misclassify CLI archive distribution as Phase 10-only.
+On 2026-11-16 the owner explicitly delegated selection of the missing low-level Community details to the technical architect. The selected defaults are recorded separately in ADR-0026 through ADR-0029 and the machine-readable contracts. They are **new delegated technical selections**, not retroactive claims that those exact route names, schemas, numeric defaults or audit encodings were present in the source baseline.
 
-A missing reference in the Community adaptation must be resolved by carrying over the existing owner-approved source decision. It must not be converted into a fresh owner question by default. Only if the complete authoritative owner-approved baseline has no answer or contains a genuine conflict should that specific gap be isolated for review. No implementation may substitute a convenient alternative for an existing approval.
+Decision precedence is strict: existing owner-approved Community ADRs first; delegated ADR-0026–0029 and their contracts second; implementation details third. A conflict with an owner-approved ADR blocks the dependent implementation until explicitly resolved. A delegated detail may be changed later only through a reviewed superseding ADR with compatibility and threat impact.
+
+Carry-forward invariants that must never be weakened:
+
+1. HTTP/JSON and gRPC share the one ADR-0005 pipeline; `/v1`, semver and two-minor deprecation remain from ADR-0015.
+2. The authentication MVP remains token, AppRole, mTLS and username/password Argon2id; OIDC/Kubernetes/LDAP remain excluded.
+3. Community remains single-tenant `root`, derived only from trusted server context.
+4. Shamir 2-of-3 remains the mandatory default Unsealer; root operations independently require explicit 2-of-3 root quorum; optional AWS KMS stays disabled by default without fallback.
+5. ADR-0005's pipeline ordering, durable intent/outcome, fail-closed behavior, minimum audit destinations and 90-day default retention remain binding.
+6. ADR-0002 async + `Send + Sync`, ADR-0003 storage semantics, ADR-0010 verification requirements, ADR-0021 no-web-UI MVP, ADR-0022 distribution/hardening and ADR-0023 Phase 2 CLI archive scope remain unchanged.
+7. PKI, KV v2/leases, Transit and encrypted Raft/HA stay in their later roadmap phases; no Enterprise-only API, dependency, service or design enters Community.
+
+Detailed implementation changes must link to the relevant delegated ADR and update both the machine-readable contract and security tests. No runtime subphase proceeds until Phase 2.0 validation and owner acceptance.
 
 ### 2.6 Required test and evidence strategy
 
@@ -295,11 +297,11 @@ Apply [ADR-0010](docs/adr/0010-testing-and-security-evidence.md) to each subphas
 - **Unit tests:** request parsing and validation, route canonicalization, pipeline ordering, rate-limit boundaries, credential lifecycle, identity construction, policy evaluation/deny-by-default, audit serialization/hash-chain verification and configuration validation.
 - **Property tests (proptest):** canonical route invariants, policy decision invariants, credential/event codec round trips, audit-chain continuity, and rate-limit/state invariants where the implementation has deterministic properties.
 - **Coverage-guided fuzzing (cargo-fuzz):** all untrusted parsers and decoders introduced by the chosen transport/schema, credential formats, route canonicalization, policy parser, audit record decoder and any security-sensitive state transition. Fuzz targets use synthetic material only; corpora must not contain valid credentials, secrets, recovery shares or production audit data. Add a deterministic regression test for every discovered defect.
-- **Integration tests:** a real in-process TLS listener and the selected transport, request middleware, trusted-proxy boundary, storage/seal integration, authentication plugins, ACL decisions, rate limiter and audit sinks. Include process restart and injected sink/storage failure where persistence is involved.
-- **Security tests:** unauthorized/unauthenticated requests, expired/revoked/replayed credentials, spoofed client-address headers, path and encoding ambiguity, policy bypass, privilege escalation, sealed-mode bypass, oversized/slow requests, cancellation, secret leakage and audit failure. Add protocol-specific negative cases after the transport is chosen.
+- **Integration tests:** a real in-process TLS 1.3 listener carrying both HTTP/JSON and gRPC, request middleware, trusted-proxy boundary, storage/seal integration, authentication providers, ACL decisions, rate limiter and audit sinks. Include process restart and injected sink/storage failure where persistence is involved.
+- **Security tests:** unauthorized/unauthenticated requests, expired/revoked/replayed credentials, spoofed client-address headers, path and encoding ambiguity, policy bypass, privilege escalation, sealed-mode bypass, oversized/slow requests, cancellation, secret leakage and audit failure. Run equivalent negative suites through both selected transports (HTTP/JSON and gRPC), and prove neither adapter bypasses the common pipeline.
 - **End-to-end tests:** exercise the actual listener and every approved Phase 2 route across success and failure paths. Prove that no protected handler or secret response is reachable when any required earlier gate denies or when required audit intent cannot be persisted.
 - **Concurrency and runtime tools:** use Loom where shared state/concurrency models make it appropriate, Miri for eligible pure-Rust code, failure injection for persistence and cancellation, and Criterion for performance-sensitive paths. Document justified exclusions rather than claiming unrun techniques.
-- **Coverage and CI:** meet the ADR-0010 target of at least 90% measured coverage for the `auth`, `policy` and `audit` components, alongside the applicable existing crypto/seal targets. CI must enforce formatting, clippy with warnings denied, tests, dependency policy/audit, measured coverage and bounded fuzz smoke. Longer fuzz campaigns run on the scheduled/manual workflow. Run the applicable supported-platform and MSRV matrix.
+- **Coverage and CI:** meet the ADR-0010 target of at least 90% measured coverage for `crypto`, `seal`, `policy`, `auth` and `audit` components, with exclusions documented and measured against the correct crate/module boundaries. CI must enforce formatting, clippy with warnings denied, tests, dependency policy/audit, measured coverage and bounded fuzz smoke. Longer fuzz campaigns run on the scheduled/manual workflow. Run the applicable supported-platform and MSRV matrix.
 - **Evidence hygiene:** retain exact-head CI links, coverage reports, fuzz artifacts, threat-model changes, security checklist, configuration/runbook evidence and a list of limitations. Never use real credentials or production secrets in CI fixtures or artifacts.
 
 ### 2.7 Phase 2 acceptance criteria
