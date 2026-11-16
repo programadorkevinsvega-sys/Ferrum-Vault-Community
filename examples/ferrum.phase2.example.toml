@@ -67,6 +67,7 @@ approle_secret_id_uses_max = 10
 approle_token_ttl_seconds = 900
 approle_token_max_ttl_seconds = 3600
 bootstrap_token_ttl_seconds = 300
+bootstrap_setup_token_ttl_seconds = 900
 
 [ceremony]
 unseal_session_ttl_seconds = 300
