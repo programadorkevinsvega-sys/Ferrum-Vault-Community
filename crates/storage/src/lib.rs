@@ -969,7 +969,7 @@ impl RotationStore for RedbStore {
             return Err(RotationStoreError::CorruptState);
         }
         let dependency = external_dependency_key(
-            event.key_id().as_str(),
+            event.key_id(),
             event.target_key_version(),
             DependencyKind::RotationJob,
             job_id.as_bytes(),
@@ -992,7 +992,7 @@ impl RotationStore for RedbStore {
         if persist_dependency {
             ensure_key_version_not_retired(
                 &tx,
-                event.key_id().as_str(),
+                event.key_id(),
                 event.target_key_version(),
             )
             .map_err(|_| RotationStoreError::CorruptState)?;
