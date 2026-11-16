@@ -10,7 +10,7 @@ The Community storage crate implements ADR-0003 using redb as the initial durabl
 
 ## Encryption boundary
 
-The generic key/value methods persist opaque bytes. Callers must encrypt protected plaintext with `ferrum-crypto::barrier::BarrierCipher` before storing it. Use `put_encrypted` and `delete_encrypted` for FBE1 records so the live-key dependency index is updated atomically with the ciphertext record. FBE1 paths are subject to the same 4,096-byte key limit as generic KV keys.
+The generic key/value methods persist opaque bytes. Callers must encrypt protected plaintext with `ferrum-crypto::barrier::BarrierCipher` before storing it. Generic KV writes reject the reserved `FBE1` envelope magic, including batch mutations. Use `put_encrypted` and `delete_encrypted` for FBE1 records so the live-key dependency index is updated atomically with the ciphertext record. FBE1 paths are subject to the same 4,096-byte key limit as generic KV keys. On open, a one-time migration scan detects legacy FBE1 values already placed in generic KV and keeps key retirement fail-closed until those records are moved or removed and the inventory is reconciled.
 
 ## Nonce and key lifecycle
 
