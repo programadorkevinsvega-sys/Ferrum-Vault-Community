@@ -9,6 +9,7 @@ publish = false
 cargo-fuzz = true
 
 [dependencies]
+ferrum-storage = { path = "../crates/storage" }
 ferrum-crypto = { path = "../crates/crypto" }
 ferrum-recovery = { path = "../crates/recovery" }
 ferrum-seal = { path = "../crates/seal" }
@@ -106,6 +107,13 @@ bench = false
 [[bin]]
 name = "barrier_nonce_rotation"
 path = "fuzz_targets/barrier_nonce_rotation.rs"
+test = false
+doc = false
+bench = false
+
+[[bin]]
+name = "storage_cursor_decode"
+path = "fuzz_targets/storage_cursor_decode.rs"
 test = false
 doc = false
 bench = false

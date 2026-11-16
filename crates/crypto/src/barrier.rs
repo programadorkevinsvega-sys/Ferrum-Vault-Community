@@ -717,6 +717,12 @@ impl std::error::Error for KeyInventoryError {}
 /// The implementation must inspect live ciphertext, backups, snapshots and
 /// persisted rotation checkpoints, and must serialize the check against
 /// restore/retention changes. A partial inventory is not proof of absence.
+///
+/// When this retirement-gate method returns `Ok(false)`, the implementation
+/// must durably fence the key version against new ciphertext writes and new
+/// backup/snapshot/rotation-job references before returning. This is not a
+/// read-only status query: a false result authorizes the caller to remove the
+/// non-active key version, so no new dependency may race in after the check.
 pub trait KeyDependencyInventory: Send + Sync {
     fn has_dependencies(&self, key_id: &KeyId, key_version: u64)
     -> Result<bool, KeyInventoryError>;
@@ -963,7 +969,7 @@ pub struct RotationAuditEvent {
 }
 
 impl RotationAuditEvent {
-    fn new(
+    pub fn new(
         job_id: &str,
         key_id: &KeyId,
         target_key_version: u64,
