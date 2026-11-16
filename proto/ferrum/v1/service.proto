@@ -49,6 +49,7 @@ service AppRoleService {
   rpc UpdateRole(UpdateRoleRequest) returns (AppRole);
   rpc DeleteRole(DeleteRoleRequest) returns (google.protobuf.Empty);
   rpc CreateSecretId(CreateSecretIdRequest) returns (SecretIdResponse);
+  rpc RevokeSecretId(RevokeSecretIdRequest) returns (google.protobuf.Empty);
 }
 
 service PolicyService {
@@ -234,8 +235,15 @@ message CreateSecretIdRequest {
 
 message SecretIdResponse {
   string secret_id = 1; // fvsa_ prefix plus 32 random bytes encoded as unpadded base64url; returned once.
-  google.protobuf.Timestamp expires_at = 2;
-  uint32 uses = 3;
+  string accessor = 2; // Non-secret 128-bit handle, also returned on an idempotency replay.
+  google.protobuf.Timestamp expires_at = 3;
+  uint32 uses = 4;
+  bool replayed = 5; // If true, secret_id is empty and the accessor identifies the prior issuance.
+}
+
+message RevokeSecretIdRequest {
+  string role_name = 1;
+  string accessor = 2;
 }
 
 message AclRule {
