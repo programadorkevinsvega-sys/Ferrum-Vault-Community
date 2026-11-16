@@ -236,6 +236,16 @@ impl RedbStore {
 
     fn initialize_inventory_state(&self) -> Result<(), StorageError> {
         let tx = self.begin_write()?;
+
+        // Create the complete schema atomically. Empty databases must support
+        // reads/deletes before a caller's first put creates any records.
+        drop(tx.open_table(KV).map_err(|_| StorageError::Unavailable)?);
+        drop(tx.open_table(BARRIER).map_err(|_| StorageError::Unavailable)?);
+        drop(tx.open_table(NONCES).map_err(|_| StorageError::Unavailable)?);
+        drop(tx.open_table(CHECKPOINTS).map_err(|_| StorageError::Unavailable)?);
+        drop(tx.open_table(AUDIT).map_err(|_| StorageError::Unavailable)?);
+        drop(tx.open_table(DEPENDENCIES).map_err(|_| StorageError::Unavailable)?);
+
         let mut meta = tx.open_table(META).map_err(|_| StorageError::Unavailable)?;
         if meta
             .get(INVENTORY_COMPLETE)
@@ -906,18 +916,6 @@ pub fn decode_cursor(prefix: &[u8], cursor: &[u8]) -> Result<Vec<u8>, StorageErr
     Ok(last.to_vec())
 }
 
-fn nonce_key(key_id: &KeyId, version: u64) -> Result<Vec<u8>, NonceLedgerError> {
-    let id = key_id.as_str().as_bytes();
-    let length = u16::try_from(id.len()).map_err(|_| NonceLedgerError::CorruptState)?;
-    if version == 0 {
-        return Err(NonceLedgerError::CorruptState);
-    }
-    let mut key = Vec::with_capacity(2 + id.len() + 8);
-    key.extend_from_slice(&length.to_be_bytes());
-    key.extend_from_slice(id);
-    key.extend_from_slice(&version.to_be_bytes());
-    Ok(key)
-}
 fn decode_nonce_state(input: &[u8]) -> Result<(u64, u64, u64), NonceLedgerError> {
     if input.len() != 28 || input.get(..4) != Some(NONCE_MAGIC.as_slice()) {
         return Err(NonceLedgerError::CorruptState);
