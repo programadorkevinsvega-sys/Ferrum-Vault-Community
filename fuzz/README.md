@@ -78,3 +78,8 @@ The KMP boundary has no internal shared mutable state, so Loom is not applicable
 CI runs pure-Rust KMP parser tests under Miri. Miri is not an oracle for AWS-LC
 native cryptographic routines because the provider delegates those operations
 through native FFI. Reassess both techniques for later pure-Rust stateful components.
+
+
+### Durable storage cursor and record decoders
+
+`storage_cursor_decode` feeds arbitrary bytes to the versioned prefix-cursor and versioned-record decoders exposed by `ferrum-storage`. The target runs in PR smoke and scheduled campaigns. Database I/O is intentionally excluded from this byte-decoder target; transaction behavior is exercised by deterministic concurrency, property and recovery tests.
