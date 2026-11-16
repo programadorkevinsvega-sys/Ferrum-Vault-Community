@@ -10,6 +10,8 @@ The database may contain ciphertext, FBE1 envelope metadata, nonce reservation m
 
 `RedbStore` opens redb in `ConcurrencyMode::MultiWriter` and explicitly selects `Durability::Immediate` for writes. Writer transactions serialize through redb's multi-writer protocol. The nonce ledger commits its high-water mark before issuing a range. After restart the next reservation begins at that persisted mark; uncertain or partially consumed ranges are never reclaimed.
 
+The KV backend stores versioned live records and tombstones. Delete transitions a live record to a tombstone with the next version; a later put increments from that tombstone. Thus a deleted/recreated key cannot reuse an earlier CAS version (ABA). `get` and prefix pagination hide tombstones, but the version history remains durable.
+
 The following updates each share one transaction:
 - nonce high-water reservation and immutable policy;
 - FBE1 record changes and live-key dependency index;
