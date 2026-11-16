@@ -9,7 +9,8 @@ See the [source ADR classification and carryover matrix](SOURCE-MAP.md) for the 
 - **Owner-approved:** the owner approved the architecture decision in the source baseline.
 - **Accepted requirement:** the source baseline records the requirement as accepted; this label is preserved rather than upgraded.
 - **Pending:** an explicit parameter or external review remains unresolved. A pending detail does not invalidate the approved parts of its decision.
-- **Delegated technical selection:** detailed Community implementation defaults selected under explicit owner delegation; not retroactively attributed to the original source baseline and subject to the applicable phase-acceptance gate.\n- **Superseded:** replaced by a later public ADR.
+- **Delegated technical selection:** detailed Community implementation defaults selected under explicit owner delegation; not retroactively attributed to the original source baseline and subject to the applicable phase-acceptance gate.
+- **Superseded:** replaced by a later public ADR.
 
 These records describe approved design, not implemented or independently verified behavior.
 
@@ -47,7 +48,11 @@ The adaptations are written in English for public documentation. Decisions with 
 | [0022](0022-server-distribution.md) | 0022 | Server distribution | Owner-approved |
 | [0023](0023-cli-distribution.md) | 0023 | CLI distribution | Owner-approved |
 | [0024](0024-unsealer-port-and-optional-aws-kms.md) | 0024 | Unsealer port and optional AWS KMS adapter | Owner-approved |
-| [0025](0025-dual-api-transports-shared-security-pipeline.md) | 0025 | Dual native API transports with a shared security pipeline | Owner-approved |\n| [0026](0026-phase-2-native-service-contracts.md) | — | Phase 2 native service contracts | Delegated technical selection |\n| [0027](0027-phase-2-auth-acl-and-resource-controls.md) | — | Phase 2 authentication, ACL and resource controls | Delegated technical selection |\n| [0028](0028-phase-2-durable-audit-and-outbox.md) | — | Phase 2 durable audit, outbox and idempotency | Delegated technical selection |\n| [0029](0029-phase-2-server-tls-and-configuration.md) | — | Phase 2 server TLS and configuration | Delegated technical selection |
+| [0025](0025-dual-api-transports-shared-security-pipeline.md) | 0025 | Dual native API transports with a shared security pipeline | Owner-approved |
+| [0026](0026-phase-2-native-service-contracts.md) | — | Phase 2 native service contracts | Delegated technical selection |
+| [0027](0027-phase-2-auth-acl-and-resource-controls.md) | — | Phase 2 authentication, ACL and resource controls | Delegated technical selection |
+| [0028](0028-phase-2-durable-audit-and-outbox.md) | — | Phase 2 durable audit, outbox and idempotency | Delegated technical selection |
+| [0029](0029-phase-2-server-tls-and-configuration.md) | — | Phase 2 server TLS and configuration | Delegated technical selection |
 
 ## Change control
 
