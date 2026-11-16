@@ -444,6 +444,24 @@ paths:
         '401': { $ref: '#/components/responses/Unauthorized' }
         '403': { $ref: '#/components/responses/Forbidden' }
         '404': { $ref: '#/components/responses/NotFound' }
+        '409': { $ref: '#/components/responses/Conflict' }
+  /v1/sys/auth/approle/roles/{name}/secret-ids/{accessor}:
+    parameters:
+      - $ref: '#/components/parameters/RoleName'
+      - name: accessor
+        in: path
+        required: true
+        schema: { type: string, minLength: 22, maxLength: 22, pattern: '^[A-Za-z0-9_-]{22}$' }
+    delete:
+      operationId: RevokeSecretId
+      tags: [AppRole]
+      parameters:
+        - $ref: '#/components/parameters/IdempotencyKey'
+      responses:
+        '204': { description: The Secret ID was revoked immediately. }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
   /v1/sys/policies/acl:
     get:
       operationId: ListPolicies
@@ -561,7 +579,6 @@ paths:
       tags: [Root operations]
       parameters:
         - $ref: '#/components/parameters/OperationId'
-        - $ref: '#/components/parameters/IdempotencyKey'
       requestBody:
         required: true
         content:
@@ -727,6 +744,7 @@ components:
         code: { type: string, pattern: '^[a-z0-9_.-]{1,64}$' }
         requestId: { type: string, format: uuid }
         retryable: { type: boolean, default: false }
+        resultReference: { type: string, format: uri-reference, description: Non-secret accessor/reference for an already-created one-time credential; never a credential secret. }
       additionalProperties: false
     HealthResponse:
       type: object
@@ -770,7 +788,7 @@ components:
       type: object
       required: [share]
       properties:
-        share: { type: string, minLength: 1, maxLength: 4096, writeOnly: true, description: FRS1 share encoded as unpadded base64url. }
+        share: { type: string, minLength: 1, maxLength: 4096, writeOnly: true, description: Canonical binary FRS1 envelope encoded as unpadded base64url without padding; maximum decoded length 3072 bytes. }
       additionalProperties: false
     ShareProgress:
       type: object
@@ -841,7 +859,7 @@ components:
       required: [username, password, policies]
       properties:
         username: { type: string, pattern: '^[a-z0-9][a-z0-9._-]{2,63}$' }
-        password: { type: string, minLength: 12, maxLength: 1024, writeOnly: true }
+        password: { type: string, minLength: 1, maxLength: 1024, writeOnly: true, description: UTF-8 encoded length must be 12 to 1024 bytes; server validates byte length. }
         policies:
           type: array
           minItems: 1
@@ -852,7 +870,7 @@ components:
     UpdatePasswordUserRequest:
       type: object
       properties:
-        password: { type: string, minLength: 12, maxLength: 1024, writeOnly: true }
+        password: { type: string, minLength: 1, maxLength: 1024, writeOnly: true, description: UTF-8 encoded length must be 12 to 1024 bytes; server validates byte length. }
         policies:
           type: array
           minItems: 1
@@ -920,9 +938,10 @@ components:
       additionalProperties: false
     SecretIdResponse:
       type: object
-      required: [secretId, expiresAt, uses]
+      required: [secretId, accessor, expiresAt, uses]
       properties:
         secretId: { type: string, minLength: 48, maxLength: 48, pattern: '^fvsa_[A-Za-z0-9_-]{43}$' }
+        accessor: { type: string, minLength: 22, maxLength: 22, pattern: '^[A-Za-z0-9_-]{22}$' }
         expiresAt: { type: string, format: date-time }
         uses: { type: integer, minimum: 1, maximum: 10 }
       additionalProperties: false
