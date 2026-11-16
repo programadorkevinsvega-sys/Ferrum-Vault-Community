@@ -54,7 +54,7 @@ Community remains a single logical tenant named `root`. Tenant identity is injec
 - Generate a cryptographically random server request ID for every request. Return it as `X-Request-ID` for HTTP and `x-request-id` response metadata for gRPC. Never use a caller-supplied request ID as authority.
 - Use one request deadline across decode, authentication, authorization, handler, audit and response. Default deadline is 15 seconds; hard maximum is 30 seconds. Cancellation is propagated to extension points as required by ADR-0002.
 - State-changing resource mutations and root-operation initiation require an `Idempotency-Key`: 16 random bytes encoded as unpadded base64url (22 characters). Its scope is principal + canonical operation + key; retention is 24 hours. Bootstrap consumption, unseal-session creation/share submission and root-share approvals instead use one-time credentials, short-lived server sessions and participant replay detection; their secret material is never cached or retried as a new participant.
-- The server stores a digest of the canonical request, never the raw key. A repeat with the same key and same request returns the original non-secret operation result/reference. Reuse with a different request returns HTTP 409 / gRPC ALREADY_EXISTS. Credentials, unseal/root shares and secret-bearing responses are never replay-cached or reissued on retry. A retry of a one-time credential-issuance operation returns a non-secret result reference only; it never creates a second credential or reveals the original secret.
+- The server stores a digest of the canonical request, never the raw key. A repeat with the same key and same request returns the original non-secret operation result/reference. Reuse with a different request returns HTTP 409 / gRPC ALREADY_EXISTS. Credentials, unseal/root shares and secret-bearing responses are never replay-cached or reissued on retry. A repeated token/Secret ID issuance request returns HTTP 200 or gRPC OK with `replayed=true`, its non-secret accessor and expiry, and an empty/omitted credential secret. The caller may revoke the issued credential by accessor if the original secret response was lost. A different request using the same key returns HTTP 409 / gRPC ALREADY_EXISTS.
 - The idempotency record and state transition must be atomic when the backend supports it. Otherwise use the durable outbox/reconciliation contract in Section 11.
 
 ## 4. Canonical operation catalog
@@ -87,6 +87,7 @@ The exact route and RPC names below are binding for Phase 2.1. The security pipe
 | Update AppRole | `PUT /v1/sys/auth/approle/roles/{name}` | `AppRoleService.UpdateRole` | `auth/approle:manage` | No | Required intent/outcome |
 | Delete AppRole | `DELETE /v1/sys/auth/approle/roles/{name}` | `AppRoleService.DeleteRole` | `auth/approle:manage` | No | Required intent/outcome |
 | Issue AppRole Secret ID | `POST /v1/sys/auth/approle/roles/{name}/secret-ids` | `AppRoleService.CreateSecretId` | `auth/approle:manage` | No | Required intent/outcome |
+| Revoke AppRole Secret ID | `DELETE /v1/sys/auth/approle/roles/{name}/secret-ids/{accessor}` | `AppRoleService.RevokeSecretId` | `auth/approle:manage` | No | Required intent/outcome |
 | List ACL policies | `GET /v1/sys/policies/acl` | `PolicyService.ListPolicies` | `sys/policy:read` | No | Security event |
 | Read ACL policy | `GET /v1/sys/policies/acl/{name}` | `PolicyService.GetPolicy` | `sys/policy:read` | No | Security event |
 | Create/update ACL policy | `PUT /v1/sys/policies/acl/{name}` | `PolicyService.PutPolicy` | `sys/policy:manage` | No | Required intent/outcome |
@@ -136,7 +137,7 @@ All password and AppRole login failures use the same public error class and mess
 
 ### 6.1 Opaque API tokens
 
-- Token format: `fvct_` followed by 32 CSPRNG bytes encoded as unpadded base64url (43 encoded characters). The secret is returned exactly once.
+- Token format: `fvct_` followed by 32 CSPRNG bytes encoded as unpadded base64url (43 encoded characters). The secret is returned exactly once. Store only `SHA-256(ASCII("FerrumVaultCommunityTokenV1") || 0x00 || token_random_32_bytes)` plus encrypted metadata; never store the plaintext token.
 - Tokens are opaque random bearer credentials, not self-contained JWTs. The server stores a SHA-256 digest with domain separation, plus encrypted metadata. Plaintext tokens never enter storage, logs, audit, metrics, traces or test artifacts.
 - An accessor is a random 128-bit non-secret handle. It is not accepted for authentication and cannot reveal a token.
 - Default access-token TTL: 15 minutes. Standard maximum TTL: 8 hours. Privileged/root-administration token TTL: 5 minutes, absolute maximum 15 minutes, non-renewable.
@@ -154,7 +155,7 @@ All password and AppRole login failures use the same public error class and mess
 
 ### 6.3 AppRole
 
-- `role_id` is a random 128-bit public identifier encoded as unpadded base64url. `secret_id` is the `fvsa_` prefix followed by a random 256-bit secret encoded as unpadded base64url, shown once; only its SHA-256 digest is stored. Its response is one-time and is never repeated from an idempotency cache.
+- `role_id` is a random 128-bit public identifier encoded as unpadded base64url. `secret_id` is the `fvsa_` prefix followed by a random 256-bit secret encoded as unpadded base64url, shown once; store only `SHA-256(ASCII("FerrumVaultCommunityAppRoleSecretV1") || 0x00 || secret_id_random_32_bytes)`. Its response includes a separate random 128-bit accessor. A repeated idempotency key returns only that non-secret accessor, expiry, use count and `replayed=true`; it never reissues the secret. The accessor can immediately revoke the Secret ID through `RevokeSecretId`.
 - Default Secret ID TTL is 24 hours, maximum 30 days, and default use count is one. A role may explicitly configure at most 10 uses; unlimited-use Secret IDs are forbidden.
 - Role token TTL defaults to 15 minutes and is capped at 1 hour. Policies issued by a role are fixed at role configuration and cannot be expanded by login input.
 - Optional CIDR binding is checked against the trusted peer address, never a client-supplied forwarding header. Secret ID expiry/use decrement is atomic and replay-safe.
@@ -238,6 +239,7 @@ All limits are enforced before expensive parsing/handler work and remain configu
 | Control | Default | Hard maximum / behavior |
 |---|---:|---|
 | HTTP request body | 1 MiB | 1 MiB in Phase 2 |
+| FRS1 share envelope | 3,072 decoded bytes | 3,072 decoded bytes |
 | gRPC receive/send message | 1 MiB | 1 MiB in Phase 2 |
 | HTTP header bytes | 16 KiB | 16 KiB |
 | Request target / path | 8 KiB | 8 KiB |
