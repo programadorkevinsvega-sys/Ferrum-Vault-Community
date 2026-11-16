@@ -1489,11 +1489,52 @@ mod tests {
     }
 
     #[test]
+    fn fresh_inventory_requires_explicit_external_reconciliation() {
+        let file = path();
+        let store = RedbStore::open(&file).unwrap();
+        assert_eq!(
+            store.has_dependencies(&key_id(), 43),
+            Err(KeyInventoryError::Incomplete)
+        );
+        store.confirm_inventory_reconciled().unwrap();
+        assert!(!store.has_dependencies(&key_id(), 43).unwrap());
+        drop(store);
+        remove(&file);
+    }
+
+    #[test]
+    fn legacy_completeness_marker_is_invalidated_by_new_policy() {
+        let file = path();
+        {
+            let db = Builder::new()
+                .set_concurrency_mode(ConcurrencyMode::MultiWriter)
+                .create(&file)
+                .unwrap();
+            let mut tx = db.begin_write().unwrap();
+            tx.set_durability(Durability::Immediate).unwrap();
+            let mut meta = tx.open_table(META).unwrap();
+            meta.insert(INVENTORY_COMPLETE, &[1_u8][..]).unwrap();
+            drop(meta);
+            tx.commit().unwrap();
+        }
+        let store = RedbStore::open(&file).unwrap();
+        assert_eq!(
+            store.has_dependencies(&key_id(), 43),
+            Err(KeyInventoryError::Incomplete)
+        );
+        store.confirm_inventory_reconciled().unwrap();
+        assert!(!store.has_dependencies(&key_id(), 43).unwrap());
+        drop(store);
+        remove(&file);
+    }
+
+    #[test]
     fn empty_inventory_fences_late_dependencies_across_reopen() {
         let file = path();
         let record_path = CanonicalPath::new(b"kv/retired-version".to_vec()).unwrap();
         {
             let store = RedbStore::open(&file).unwrap();
+            store.confirm_inventory_reconciled().unwrap();
             assert!(!store.has_dependencies(&key_id(), 44).unwrap());
             assert_eq!(
                 store.put_encrypted(&record_path, &envelope(44)),
@@ -1532,6 +1573,7 @@ mod tests {
     fn retirement_fence_serializes_with_dependency_registration() {
         let file = path();
         let store = RedbStore::open(&file).unwrap();
+        store.confirm_inventory_reconciled().unwrap();
         let checker = store.clone();
         let registrar = store.clone();
         let check = thread::spawn(move || checker.has_dependencies(&key_id(), 91).unwrap());
@@ -1834,6 +1876,7 @@ mod tests {
         let file = path();
         {
             let store = RedbStore::open(&file).unwrap();
+            store.confirm_inventory_reconciled().unwrap();
             store
                 .save_checkpoint_with_audit(
                     "job-fence",
@@ -1878,6 +1921,7 @@ mod tests {
         {
             let store = RedbStore::open(&file).unwrap();
             store.put_encrypted(&record_path, &old).unwrap();
+            store.confirm_inventory_reconciled().unwrap();
             assert!(store.has_dependencies(&key_id(), 1).unwrap());
             assert!(
                 store
@@ -1947,10 +1991,20 @@ mod tests {
         store
             .register_dependency("community/test-key", 1, DependencyKind::Backup, b"backup-1")
             .unwrap();
+        store
+            .register_dependency("community/test-key", 1, DependencyKind::Snapshot, b"snapshot-1")
+            .unwrap();
+        store.confirm_inventory_reconciled().unwrap();
         assert!(store.has_dependencies(&key_id(), 1).unwrap());
         assert!(
             store
                 .remove_dependency("community/test-key", 1, DependencyKind::Backup, b"backup-1")
+                .unwrap()
+        );
+        assert!(store.has_dependencies(&key_id(), 1).unwrap());
+        assert!(
+            store
+                .remove_dependency("community/test-key", 1, DependencyKind::Snapshot, b"snapshot-1")
                 .unwrap()
         );
         assert!(!store.has_dependencies(&key_id(), 1).unwrap());
