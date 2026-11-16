@@ -2,13 +2,13 @@
 
 ## Scope and trust boundary
 
-The initial Community persistence backend is redb 4.6.0, selected by ADR-0003. redb is an embedded storage engine, not a cryptographic provider. `ferrum-storage` stores opaque values; protected plaintext must be encrypted by the barrier before persistence. FBE1 records are kept in a dedicated table with a durable dependency index used during key retirement.
+The initial Community persistence backend is redb 4.6.0, selected by ADR-0003. redb is an embedded storage engine, not a cryptographic provider. `ferrum-storage` stores opaque values; protected plaintext must be encrypted by the barrier before persistence. FBE1 records are kept in a dedicated table with a durable dependency index used during key retirement. Generic KV writes reject the reserved `FBE1` envelope magic, including batch mutations. A one-time open-time migration scan detects legacy FBE1 values already stored in generic KV; reconciliation refuses to mark the inventory complete while any such live value remains.
 
 The database may contain ciphertext, FBE1 envelope metadata, nonce reservation metadata, rotation checkpoints, audit metadata and key-dependency indexes. It must not contain plaintext DEKs, seal-root material, Shamir shares, bootstrap tokens or unencrypted protected values. FBE1 paths enforce the 4,096-byte storage-key limit.
 
 ## Durability and concurrency
 
-`RedbStore` opens redb in `ConcurrencyMode::MultiWriter` and explicitly selects `Durability::Immediate` for writes. Writer transactions serialize through redb's multi-writer protocol. The nonce ledger commits its high-water mark before issuing a range. After restart the next reservation begins at that persisted mark; uncertain or partially consumed ranges are never reclaimed.
+`RedbStore` opens redb in `ConcurrencyMode::MultiWriter` and explicitly selects `Durability::Immediate` for writes. Writer transactions serialize through redb's multi-writer protocol. The nonce ledger commits its high-water mark before issuing a range. After restart the next reservation begins at that persisted mark; uncertain or partially consumed ranges are never reclaimed. If the next complete block would cross the configured rotation threshold, the adapter rejects it without advancing the high-water mark, so repeated attempts do not consume more ranges.
 
 The KV backend stores versioned live records and tombstones. Delete transitions a live record to a tombstone with the next version; a later put increments from that tombstone. Thus a deleted/recreated key cannot reuse an earlier CAS version (ABA). `get` and prefix pagination hide tombstones, but the version history remains durable.
 
@@ -36,7 +36,7 @@ Backups must use a coordinated consistent snapshot/backup procedure. Preserve th
 - redb checksums and crash recovery protect consistency, not authenticity against a privileged filesystem attacker who can rewrite data and recompute checksums.
 - Filesystem, device, controller and cloud-volume durability guarantees remain deployment dependencies.
 - The dependency index knows only external backup/snapshot/job references that the operator/integration registers.
-- Generic `KvBackend` methods accept opaque bytes. Service code must enforce encrypt-before-storage; use FBE1 methods to preserve key dependency accounting.
+- Generic `KvBackend` methods accept opaque bytes but reject the reserved FBE1 envelope magic. Service code must enforce encrypt-before-storage; use FBE1 methods to preserve key dependency accounting.
 - Community remains a single logical tenant (`root`), not tenant isolation.
 - ADR-0004's production nonce block size and AES-GCM rotation threshold remain unselected.
 - This is not FIPS validation, an independent security audit or production certification.
