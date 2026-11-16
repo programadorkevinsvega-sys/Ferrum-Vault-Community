@@ -10,11 +10,11 @@ The Community storage crate implements ADR-0003 using redb as the initial durabl
 
 ## Encryption boundary
 
-The generic key/value methods persist opaque bytes. Callers must encrypt protected plaintext with `ferrum-crypto::barrier::BarrierCipher` before storing it. Use `put_encrypted` and `delete_encrypted` for FBE1 records so the live-key dependency index is updated atomically with the ciphertext record.
+The generic key/value methods persist opaque bytes. Callers must encrypt protected plaintext with `ferrum-crypto::barrier::BarrierCipher` before storing it. Use `put_encrypted` and `delete_encrypted` for FBE1 records so the live-key dependency index is updated atomically with the ciphertext record. FBE1 paths are subject to the same 4,096-byte key limit as generic KV keys.
 
 ## Nonce and key lifecycle
 
-The nonce ledger persists the high-water reservation and caller-supplied policy in one immediate-durability transaction before returning a reservation. Policy is immutable for each `(key_id, key_version)`. This crate does not select a nonce block size or AES-GCM rotation threshold; ADR-0004's owner-pending parameters remain explicit caller inputs.
+The nonce ledger persists the high-water reservation and caller-supplied policy in one immediate-durability transaction before returning a reservation. Policy is immutable for each `(key_id, key_version)`. It refuses the entire next block before committing if the block would cross the configured rotation threshold, so repeated requests cannot burn additional counter ranges after rotation is required. This crate does not select a nonce block size or AES-GCM rotation threshold; ADR-0004's owner-pending parameters remain explicit caller inputs.
 
 The dependency inventory tracks live FBE1 records and explicit backup, snapshot and in-progress rotation-job registrations. Key retirement checks fail closed until the operator has reconciled the complete external inventory and marks it complete. A database marker is not a substitute for discovering external backup media.
 
