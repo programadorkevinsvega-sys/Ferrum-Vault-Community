@@ -1339,10 +1339,7 @@ mod tests {
                 .map(|(_, value)| value)
                 .expect("child prints its reservation");
             let (start, end) = marker.split_once(':').expect("reservation has two bounds");
-            reservations.push((
-                start.parse::<u64>().unwrap(),
-                end.parse::<u64>().unwrap(),
-            ));
+            reservations.push((start.parse::<u64>().unwrap(), end.parse::<u64>().unwrap()));
         }
 
         reservations.sort_unstable_by_key(|reservation| reservation.0);
@@ -1422,7 +1419,9 @@ mod tests {
         );
         assert!(store.get(b"kv/aba").unwrap().is_none());
         assert_eq!(
-            store.compare_and_swap(b"kv/aba", None, Some(b"recreated-again")).unwrap(),
+            store
+                .compare_and_swap(b"kv/aba", None, Some(b"recreated-again"))
+                .unwrap(),
             Some(5)
         );
         assert_eq!(
