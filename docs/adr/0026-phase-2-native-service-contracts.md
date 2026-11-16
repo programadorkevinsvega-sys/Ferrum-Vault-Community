@@ -15,7 +15,7 @@ The owner explicitly delegated the choice of detailed, previously unspecified Co
 2. Both transports serve the same canonical operation catalog, principal, tenant, resource/action, policy snapshot, rate-limit state and audit operation ID.
 3. One TLS listener serves HTTP/JSON and gRPC with ALPN `h2` and `http/1.1`; default bind is loopback `127.0.0.1:8443`. Only TLS 1.3 is accepted; 0-RTT is disabled.
 4. HTTP errors use RFC 9457 Problem Details. gRPC errors use canonical status codes plus a `google.rpc.Status` detail with the same stable error code and request ID.
-5. The exact operations, HTTP paths, RPC names, shared request context, response fields, idempotency and compatibility rules are in the service contract and machine-readable artifacts.
+5. The exact operations, HTTP paths, RPC names, shared request context, response fields, idempotency and compatibility rules are in the service contract and machine-readable artifacts. The AppRole API includes one-time Secret ID creation and immediate accessor-based revocation; idempotency replay receipts never expose the secret again.
 6. Phase 2 does not include PKI, KV v2/leases, Transit, Raft/HA, a web UI, Vault-compatibility endpoints, OIDC, Kubernetes authentication or LDAP.
 
 ## Consequences
@@ -24,6 +24,7 @@ The owner explicitly delegated the choice of detailed, previously unspecified Co
 - A protocol adapter may decode and encode only; all security decisions stay in the shared pipeline.
 - Schema compatibility is checked in CI. Breaking changes require a new API version or an explicitly approved migration.
 - The machine-readable contracts are design artifacts; they do not claim the server runtime exists.
+- The API includes the complete AppRole Secret ID lifecycle (create once, revoke by accessor) and secret-safe replay receipt semantics.
 
 ## Verification
 
