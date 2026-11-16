@@ -1353,9 +1353,22 @@ mod tests {
             store.compare_and_swap(b"kv/aba", Some(1), Some(b"stale-again")),
             Err(StorageError::Conflict)
         );
+        assert_eq!(
+            store.compare_and_swap(b"kv/aba", Some(3), None).unwrap(),
+            None
+        );
+        assert!(store.get(b"kv/aba").unwrap().is_none());
+        assert_eq!(
+            store.compare_and_swap(b"kv/aba", None, Some(b"recreated-again")).unwrap(),
+            Some(5)
+        );
+        assert_eq!(
+            store.compare_and_swap(b"kv/aba", Some(3), Some(b"stale-after-cas-delete")),
+            Err(StorageError::Conflict)
+        );
         let live = store.get(b"kv/aba").unwrap().unwrap();
-        assert_eq!(live.version(), 3);
-        assert_eq!(live.value(), b"recreated");
+        assert_eq!(live.version(), 5);
+        assert_eq!(live.value(), b"recreated-again");
 
         drop(store);
         remove(&file);
