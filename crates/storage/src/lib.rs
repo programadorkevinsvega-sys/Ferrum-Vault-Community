@@ -1836,6 +1836,46 @@ mod tests {
     }
 
     #[test]
+    fn rotation_checkpoint_registers_and_releases_target_key_dependency() {
+        let file = path();
+        {
+            let store = RedbStore::open(&file).unwrap();
+            store
+                .save_checkpoint_with_audit(
+                    "job-fence",
+                    RotationCheckpoint::new(2, None, false).unwrap(),
+                    event("job-fence", RotationAuditKind::Started),
+                )
+                .unwrap();
+        }
+        {
+            let store = RedbStore::open(&file).unwrap();
+            assert!(store.has_dependencies(&key_id(), 2).unwrap());
+            store
+                .save_checkpoint_with_audit(
+                    "job-fence",
+                    RotationCheckpoint::new(2, None, true).unwrap(),
+                    event("job-fence", RotationAuditKind::Completed),
+                )
+                .unwrap();
+        }
+        {
+            let store = RedbStore::open(&file).unwrap();
+            assert!(!store.has_dependencies(&key_id(), 2).unwrap());
+            assert_eq!(
+                store.register_dependency(
+                    "community/test-key",
+                    2,
+                    DependencyKind::Snapshot,
+                    b"late-snapshot",
+                ),
+                Err(StorageError::InvalidInput)
+            );
+        }
+        remove(&file);
+    }
+
+    #[test]
     fn rotation_cas_audit_checkpoint_and_dependencies_survive_reopen() {
         let file = path();
         let record_path = CanonicalPath::new(b"kv/rotation".to_vec()).unwrap();
