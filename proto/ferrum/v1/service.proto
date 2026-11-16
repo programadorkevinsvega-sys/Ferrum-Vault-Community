@@ -106,12 +106,11 @@ message ShareSubmission {
 message ShareProgress {
   enum Status {
     STATUS_UNSPECIFIED = 0;
-    ACCEPTED = 1;
+    IN_PROGRESS = 1;
     COMPLETED = 2;
   }
   Status status = 1;
-  uint32 accepted_shares = 2;
-  uint32 threshold = 3;
+  uint32 threshold = 2;
 }
 
 message PasswordLoginRequest {
@@ -320,8 +319,7 @@ message RootOperation {
   BeginRootOperationRequest.Operation operation = 2;
   Status status = 3;
   google.protobuf.Timestamp expires_at = 4;
-  uint32 accepted_approvals = 5;
-  uint32 threshold = 6;
+  uint32 threshold = 5;
 }
 
 message AuditStatus {
