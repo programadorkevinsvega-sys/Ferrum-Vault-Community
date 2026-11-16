@@ -24,6 +24,7 @@ const NONCES: TableDefinition<&[u8], &[u8]> = TableDefinition::new("nonce_ledger
 const CHECKPOINTS: TableDefinition<&[u8], &[u8]> = TableDefinition::new("rotation_checkpoints_v1");
 const AUDIT: TableDefinition<&[u8], &[u8]> = TableDefinition::new("rotation_audit_v1");
 const DEPENDENCIES: TableDefinition<&[u8], &[u8]> = TableDefinition::new("key_dependencies_v1");
+const RETIRED_KEYS: TableDefinition<&[u8], &[u8]> = TableDefinition::new("retired_key_versions_v1");
 const META: TableDefinition<&[u8], &[u8]> = TableDefinition::new("storage_meta_v1");
 
 const INVENTORY_COMPLETE: &[u8] = b"inventory-complete";
@@ -262,6 +263,10 @@ impl RedbStore {
             tx.open_table(DEPENDENCIES)
                 .map_err(|_| StorageError::Unavailable)?,
         );
+        drop(
+            tx.open_table(RETIRED_KEYS)
+                .map_err(|_| StorageError::Unavailable)?,
+        );
 
         let mut meta = tx.open_table(META).map_err(|_| StorageError::Unavailable)?;
         let inventory_exists = meta
@@ -320,6 +325,11 @@ impl RedbStore {
         validate_value(envelope)?;
         BarrierEnvelope::decode(envelope).map_err(|_| StorageError::CorruptRecord)?;
         let tx = self.begin_write()?;
+        ensure_key_version_not_retired(
+            &tx,
+            parsed.key_id().as_str(),
+            parsed.key_version(),
+        )?;
         let records = tx
             .open_table(BARRIER)
             .map_err(|_| StorageError::Unavailable)?;
@@ -375,6 +385,7 @@ impl RedbStore {
     ) -> Result<(), StorageError> {
         let key = external_dependency_key(key_id, key_version, kind, resource_id)?;
         let tx = self.begin_write()?;
+        ensure_key_version_not_retired(&tx, key_id, key_version)?;
         let mut table = tx
             .open_table(DEPENDENCIES)
             .map_err(|_| StorageError::Unavailable)?;
@@ -423,14 +434,28 @@ impl RedbStore {
         drop(kv);
 
         let mut live_dependencies = Vec::new();
+        let retired = tx
+            .open_table(RETIRED_KEYS)
+            .map_err(|_| StorageError::Unavailable)?;
         let records = tx
             .open_table(BARRIER)
             .map_err(|_| StorageError::Unavailable)?;
         for entry in records.iter().map_err(|_| StorageError::Unavailable)? {
             let (path, envelope) = entry.map_err(|_| StorageError::Unavailable)?;
+            let parsed = BarrierEnvelope::decode(envelope.value())
+                .map_err(|_| StorageError::CorruptRecord)?;
+            let retired_key = dependency_prefix(parsed.key_id().as_str(), parsed.key_version())?;
+            if retired
+                .get(retired_key.as_slice())
+                .map_err(|_| StorageError::Unavailable)?
+                .is_some()
+            {
+                return Err(StorageError::CorruptRecord);
+            }
             live_dependencies.push(live_dependency_key(envelope.value(), path.value())?);
         }
         drop(records);
+        drop(retired);
 
         let dependencies = tx
             .open_table(DEPENDENCIES)
@@ -775,8 +800,7 @@ impl KeyDependencyInventory for RedbStore {
         let prefix = dependency_prefix(key_id.as_str(), key_version)
             .map_err(|_| KeyInventoryError::Unavailable)?;
         let tx = self
-            .database
-            .begin_read()
+            .begin_write()
             .map_err(|_| KeyInventoryError::Unavailable)?;
         let meta = tx
             .open_table(META)
@@ -790,15 +814,34 @@ impl KeyDependencyInventory for RedbStore {
             return Err(KeyInventoryError::Incomplete);
         }
         drop(meta);
+        let mut retired = tx
+            .open_table(RETIRED_KEYS)
+            .map_err(|_| KeyInventoryError::Unavailable)?;
+        let already_retired = retired
+            .get(prefix.as_slice())
+            .map_err(|_| KeyInventoryError::Unavailable)?
+            .is_some();
         let table = tx
             .open_table(DEPENDENCIES)
             .map_err(|_| KeyInventoryError::Unavailable)?;
         for entry in table.iter().map_err(|_| KeyInventoryError::Unavailable)? {
             let (key, _) = entry.map_err(|_| KeyInventoryError::Unavailable)?;
             if key.value().starts_with(&prefix) {
+                if already_retired {
+                    return Err(KeyInventoryError::Incomplete);
+                }
                 return Ok(true);
             }
         }
+        drop(table);
+        if !already_retired {
+            retired
+                .insert(prefix.as_slice(), &[1_u8][..])
+                .map_err(|_| KeyInventoryError::Unavailable)?;
+        }
+        drop(retired);
+        tx.commit()
+            .map_err(|_| KeyInventoryError::Unavailable)?;
         Ok(false)
     }
 }
@@ -879,6 +922,14 @@ impl RotationStore for RedbStore {
         let tx = self
             .begin_write()
             .map_err(|_| RotationStoreError::Unavailable)?;
+        let replacement = BarrierEnvelope::decode(replacement_envelope)
+            .map_err(|_| RotationStoreError::CorruptState)?;
+        ensure_key_version_not_retired(
+            &tx,
+            replacement.key_id().as_str(),
+            replacement.key_version(),
+        )
+        .map_err(|_| RotationStoreError::CorruptState)?;
         let records = tx
             .open_table(BARRIER)
             .map_err(|_| RotationStoreError::Unavailable)?;
@@ -1102,6 +1153,26 @@ fn dependency_prefix(id: &str, version: u64) -> Result<Vec<u8>, StorageError> {
     out.extend_from_slice(&version.to_be_bytes());
     Ok(out)
 }
+fn ensure_key_version_not_retired(
+    tx: &WriteTransaction,
+    id: &str,
+    version: u64,
+) -> Result<(), StorageError> {
+    let key = dependency_prefix(id, version)?;
+    let table = tx
+        .open_table(RETIRED_KEYS)
+        .map_err(|_| StorageError::Unavailable)?;
+    let retired = table
+        .get(key.as_slice())
+        .map_err(|_| StorageError::Unavailable)?
+        .is_some();
+    if retired {
+        Err(StorageError::InvalidInput)
+    } else {
+        Ok(())
+    }
+}
+
 fn external_dependency_key(
     id: &str,
     version: u64,
@@ -1386,6 +1457,78 @@ mod tests {
         drop(table);
         drop(tx);
         drop(reopened);
+        remove(&file);
+    }
+
+    #[test]
+    fn empty_inventory_fences_late_dependencies_across_reopen() {
+        let file = path();
+        let record_path = CanonicalPath::new(b"kv/retired-version".to_vec()).unwrap();
+        {
+            let store = RedbStore::open(&file).unwrap();
+            assert!(!store.has_dependencies(&key_id(), 44).unwrap());
+            assert_eq!(
+                store.put_encrypted(&record_path, &envelope(44)),
+                Err(StorageError::InvalidInput)
+            );
+            assert_eq!(
+                store.register_dependency(
+                    "community/test-key",
+                    44,
+                    DependencyKind::Backup,
+                    b"late-backup",
+                ),
+                Err(StorageError::InvalidInput)
+            );
+        }
+        {
+            let store = RedbStore::open(&file).unwrap();
+            assert_eq!(
+                store.register_dependency(
+                    "community/test-key",
+                    44,
+                    DependencyKind::Snapshot,
+                    b"late-snapshot",
+                ),
+                Err(StorageError::InvalidInput)
+            );
+            assert_eq!(
+                store.put_encrypted(&record_path, &envelope(44)),
+                Err(StorageError::InvalidInput)
+            );
+        }
+        remove(&file);
+    }
+
+    #[test]
+    fn retirement_fence_serializes_with_dependency_registration() {
+        let file = path();
+        let store = RedbStore::open(&file).unwrap();
+        let checker = store.clone();
+        let registrar = store.clone();
+        let check = thread::spawn(move || checker.has_dependencies(&key_id(), 91).unwrap());
+        let registration = thread::spawn(move || {
+            registrar.register_dependency(
+                "community/test-key",
+                91,
+                DependencyKind::Backup,
+                b"racing-backup",
+            )
+        });
+        let has_dependencies = check.join().unwrap();
+        let registered = registration.join().unwrap();
+        assert_eq!(has_dependencies, registered.is_ok());
+        if registered.is_ok() {
+            assert!(store
+                .remove_dependency(
+                    "community/test-key",
+                    91,
+                    DependencyKind::Backup,
+                    b"racing-backup",
+                )
+                .unwrap());
+        }
+        drop(store);
         remove(&file);
     }
 
