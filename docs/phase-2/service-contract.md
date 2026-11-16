@@ -53,8 +53,8 @@ Community remains a single logical tenant named `root`. Tenant identity is injec
 
 - Generate a cryptographically random server request ID for every request. Return it as `X-Request-ID` for HTTP and `x-request-id` response metadata for gRPC. Never use a caller-supplied request ID as authority.
 - Use one request deadline across decode, authentication, authorization, handler, audit and response. Default deadline is 15 seconds; hard maximum is 30 seconds. Cancellation is propagated to extension points as required by ADR-0002.
-- State-changing operations require an `Idempotency-Key`: 16 random bytes encoded as unpadded base64url (22 characters). Its scope is principal + canonical operation + key; retention is 24 hours.
-- The server stores a digest of the canonical request, never the raw key. A repeat with the same key and same request returns the original non-secret operation result/reference. Reuse with a different request returns HTTP 409 / gRPC ALREADY_EXISTS. Credentials, unseal/root shares and secret-bearing responses are never replay-cached or reissued on retry; an expired/ambiguous issuance requires a new idempotency key after the caller resolves the original operation through its non-secret state.
+- State-changing resource mutations require an `Idempotency-Key`: 16 random bytes encoded as unpadded base64url (22 characters). Its scope is principal + canonical operation + key; retention is 24 hours. Bootstrap/unseal/root-share ceremony requests instead use one-time credentials, short-lived server sessions and participant replay detection; their secret material is never cached or retried as a new participant.
+- The server stores a digest of the canonical request, never the raw key. A repeat with the same key and same request returns the original non-secret operation result/reference. Reuse with a different request returns HTTP 409 / gRPC ALREADY_EXISTS. Credentials, unseal/root shares and secret-bearing responses are never replay-cached or reissued on retry. A retry of a one-time credential-issuance operation returns a non-secret result reference only; it never creates a second credential or reveals the original secret.
 - The idempotency record and state transition must be atomic when the backend supports it. Otherwise use the durable outbox/reconciliation contract in Section 11.
 
 ## 4. Canonical operation catalog
@@ -154,7 +154,7 @@ All password and AppRole login failures use the same public error class and mess
 
 ### 6.3 AppRole
 
-- `role_id` is a random 128-bit public identifier encoded as unpadded base64url. `secret_id` is the `fvsa_` prefix followed by a random 256-bit secret encoded as unpadded base64url, shown once; only its SHA-256 digest is stored.
+- `role_id` is a random 128-bit public identifier encoded as unpadded base64url. `secret_id` is the `fvsa_` prefix followed by a random 256-bit secret encoded as unpadded base64url, shown once; only its SHA-256 digest is stored. Its response is one-time and is never repeated from an idempotency cache.
 - Default Secret ID TTL is 24 hours, maximum 30 days, and default use count is one. A role may explicitly configure at most 10 uses; unlimited-use Secret IDs are forbidden.
 - Role token TTL defaults to 15 minutes and is capped at 1 hour. Policies issued by a role are fixed at role configuration and cannot be expanded by login input.
 - Optional CIDR binding is checked against the trusted peer address, never a client-supplied forwarding header. Secret ID expiry/use decrement is atomic and replay-safe.
