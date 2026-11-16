@@ -30,6 +30,13 @@ Adopt the conservative, explicit limits in [configuration-contract.md](../phase-
 
 Rate limits are mandatory: pre-auth IP, login IP+identifier, unseal IP, post-auth identity and administrative mutation buckets. Rate-limit backend failure never disables enforcement. Trusted `Forwarded` is honored only from explicitly configured immediate proxy peers; `X-Forwarded-For` is never authoritative.
 
+## Root-operation quorum ceremony
+
+- Root operations remain governed by the separately approved root-operation 2-of-3 quorum (ADR-0014), not by the unseal quorum and not merely by API authentication.
+- The operator must explicitly configure `[ceremony.root_quorum]` as `threshold = 2`, `total_shares = 3`; no implicit default or alternate fallback is allowed. Missing/invalid configuration blocks root operations.
+- At most one root mutation session may be active globally, with a five-minute lifetime. Every approval requires a different authenticated principal and a distinct valid FRS1 participant share bound to the active operation.
+- Share bytes are held only in zeroizing memory and never persisted, logged, audited, traced or emitted as metrics. The service may persist only a domain-separated participant fingerprint for duplicate/replay prevention. API responses expose operation state and the fixed threshold, not the number of shares/approvals or participant identity.
+
 ## Rationale
 
 Opaque tokens make revocation immediate and avoid signing-key/claim drift. Bounded password hashing balances RFC 9106's memory-hard protection with controlled concurrency and predictable resource consumption. A deliberately small ACL grammar is easier to review, fuzz and reason about than a custom policy scripting language. Explicit resource bounds address the unrestricted resource-consumption risk identified by OWASP API4:2023.
