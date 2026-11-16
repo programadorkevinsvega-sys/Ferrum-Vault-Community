@@ -443,9 +443,7 @@ impl KvBackend for RedbStore {
             .begin_read()
             .map_err(|_| StorageError::Unavailable)?;
         let table = tx.open_table(KV).map_err(|_| StorageError::Unavailable)?;
-        let stored = table
-            .get(key)
-            .map_err(|_| StorageError::Unavailable)?;
+        let stored = table.get(key).map_err(|_| StorageError::Unavailable)?;
         match stored {
             Some(value) => {
                 let (version, value) = decode_versioned_record(value.value())?;
@@ -1346,7 +1344,9 @@ mod tests {
         );
 
         assert_eq!(
-            store.compare_and_swap(b"kv/aba", None, Some(b"recreated")).unwrap(),
+            store
+                .compare_and_swap(b"kv/aba", None, Some(b"recreated"))
+                .unwrap(),
             Some(3)
         );
         assert_eq!(
