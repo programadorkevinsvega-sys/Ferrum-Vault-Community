@@ -29,7 +29,7 @@ Unknown keys, duplicate keys, type coercion, invalid enum values, malformed CIDR
 | `timeouts` | header/body/handler/idle limits | 5s / 10s / 15s / 60s; handler hard maximum 30s |
 | `rate_limit` | pre-auth, login, unseal and identity buckets | Mandatory; defaults in Section 4 |
 | `auth` | token TTL ceilings, Argon2id parameters and work concurrency | Mandatory; defaults in Section 5 |
-| `ceremony` | unseal/root session lifetimes and active-session limits | 5 minutes; unseal 1 active session |
+| `ceremony` | unseal/root session lifetimes, active-session caps and explicit root quorum | 5 minutes; one unseal session; one root operation; root quorum must explicitly be 2-of-3 |
 | `storage` | redb data directory | Required, absolute, service-owned and non-symlink |
 | `audit` | hash-chain file, stdout and optional TLS syslog | File + stdout enabled; 90-day retention |
 | `outbox` | maximum pending and oldest pending age | 10,000 events / 60 seconds |
@@ -97,12 +97,15 @@ Hard bounds may be equal to defaults for parser-facing maximums. An operator may
 | Unseal session TTL | 300 seconds; one active session |
 | Root-operation approval TTL | 300 seconds |
 
+Root-quorum configuration is mandatory for root operations: `[ceremony.root_quorum]` must explicitly contain `threshold = 2` and `total_shares = 3`. There is no implicit default, alternative quorum or provider fallback. Missing/invalid quorum data disables root operations fail-closed. The maximum number of active root-operation sessions is fixed at one and cannot be raised by configuration.
+
 A setting that could weaken credential policy is not configurable above its stated maximum. Local tests may inject much smaller values through test-only constructors; production config cannot.
 
 ## 6. TLS and proxy behavior
 
 - `server.tls.cert_file` and `server.tls.key_file` are required. TLS 1.3 is fixed and cannot be lowered.
 - mTLS is enabled only when its trust bundle, exact SAN-to-principal mappings and required revocation material are present and valid.
+- `ceremony.root_operation_max_active` is fixed at 1; `ceremony.root_quorum.threshold` must be explicitly set to 2 and `ceremony.root_quorum.total_shares` to 3. Missing/invalid quorum configuration blocks root operations.
 - `server.trusted_proxy_cidrs` is empty by default. The source peer address is authoritative. If networks are added, only RFC 7239 `Forwarded` values received directly from those peers are trusted; at most five hops are parsed. Malformed, obfuscated or ambiguous chains are rejected. `X-Forwarded-For` is never authoritative.
 - A proxy must connect to Ferrum over a separately authenticated TLS link. A certificate identity forwarded in an HTTP/gRPC header is never trusted.
 - TLS 0-RTT is always disabled.
