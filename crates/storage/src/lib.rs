@@ -27,6 +27,8 @@ const DEPENDENCIES: TableDefinition<&[u8], &[u8]> = TableDefinition::new("key_de
 const META: TableDefinition<&[u8], &[u8]> = TableDefinition::new("storage_meta_v1");
 
 const INVENTORY_COMPLETE: &[u8] = b"inventory-complete";
+const KV_FBE1_SCAN_COMPLETE: &[u8] = b"kv-fbe1-scan-complete";
+const BARRIER_ENVELOPE_MAGIC: &[u8; 4] = b"FBE1";
 const AUDIT_SEQUENCE: &[u8] = b"audit-sequence";
 const CURSOR_MAGIC: &[u8; 4] = b"FVC1";
 const NONCE_MAGIC: &[u8; 4] = b"FNL1";
@@ -159,7 +161,7 @@ impl Mutation {
         let key = key.into();
         let value = value.into();
         validate_key(&key)?;
-        validate_value(&value)?;
+        validate_generic_value(&value)?;
         Ok(Self::Put { key, value })
     }
     pub fn delete(key: impl Into<Vec<u8>>) -> Result<Self, StorageError> {
@@ -262,18 +264,50 @@ impl RedbStore {
         );
 
         let mut meta = tx.open_table(META).map_err(|_| StorageError::Unavailable)?;
-        if meta
+        let inventory_exists = meta
             .get(INVENTORY_COMPLETE)
             .map_err(|_| StorageError::Unavailable)?
-            .is_none()
-        {
+            .is_some();
+        let scan_complete = meta
+            .get(KV_FBE1_SCAN_COMPLETE)
+            .map_err(|_| StorageError::Unavailable)?
+            .map(|v| v.value().to_vec())
+            .is_some_and(|value| value == [1]);
+        let mut untracked_fbe1 = false;
+
+        // One-time migration scan for a prior version that may have persisted
+        // FBE1 values through generic KV without updating key dependencies.
+        if !inventory_exists || !scan_complete {
+            let kv = tx.open_table(KV).map_err(|_| StorageError::Unavailable)?;
+            for entry in kv.iter().map_err(|_| StorageError::Unavailable)? {
+                let (_, value) = entry.map_err(|_| StorageError::Unavailable)?;
+                let (_, live) = decode_versioned_record(value.value())?;
+                if live.as_deref().is_some_and(is_barrier_envelope) {
+                    untracked_fbe1 = true;
+                    break;
+                }
+            }
+            drop(kv);
+            meta.insert(KV_FBE1_SCAN_COMPLETE, &[1_u8][..])
+                .map_err(|_| StorageError::Unavailable)?;
+            if untracked_fbe1 {
+                meta.insert(INVENTORY_COMPLETE, &[0_u8][..])
+                    .map_err(|_| StorageError::Unavailable)?;
+            }
+        }
+
+        if !inventory_exists {
             let records = tx
                 .open_table(BARRIER)
                 .map_err(|_| StorageError::Unavailable)?;
-            let complete = records.is_empty().map_err(|_| StorageError::Unavailable)?;
+            let barrier_empty = records.is_empty().map_err(|_| StorageError::Unavailable)?;
             drop(records);
-            let marker: &[u8] = if complete { &[1] } else { &[0] };
-            meta.insert(INVENTORY_COMPLETE, marker)
+            let complete: &[u8] = if barrier_empty && !untracked_fbe1 {
+                &[1]
+            } else {
+                &[0]
+            };
+            meta.insert(INVENTORY_COMPLETE, complete)
                 .map_err(|_| StorageError::Unavailable)?;
         }
         drop(meta);
@@ -378,6 +412,16 @@ impl RedbStore {
     pub fn confirm_inventory_reconciled(&self) -> Result<(), StorageError> {
         let tx = self.begin_write()?;
 
+        let kv = tx.open_table(KV).map_err(|_| StorageError::Unavailable)?;
+        for entry in kv.iter().map_err(|_| StorageError::Unavailable)? {
+            let (_, value) = entry.map_err(|_| StorageError::Unavailable)?;
+            let (_, live) = decode_versioned_record(value.value())?;
+            if live.as_deref().is_some_and(is_barrier_envelope) {
+                return Err(StorageError::CorruptRecord);
+            }
+        }
+        drop(kv);
+
         let mut live_dependencies = Vec::new();
         let records = tx
             .open_table(BARRIER)
@@ -457,7 +501,7 @@ impl KvBackend for RedbStore {
 
     fn put(&self, key: &[u8], value: &[u8]) -> Result<u64, StorageError> {
         validate_key(key)?;
-        validate_value(value)?;
+        validate_generic_value(value)?;
         let tx = self.begin_write()?;
         let mut table = tx.open_table(KV).map_err(|_| StorageError::Unavailable)?;
         let old = table
@@ -582,6 +626,9 @@ impl KvBackend for RedbStore {
         }
         for (index, mutation) in mutations.iter().enumerate() {
             validate_key(mutation.key())?;
+            if let Mutation::Put { value, .. } = mutation {
+                validate_generic_value(value)?;
+            }
             if mutation.key() != preconditions[index].key.as_slice()
                 || mutations[..index].iter().any(|m| m.key() == mutation.key())
             {
@@ -913,6 +960,16 @@ fn validate_key(key: &[u8]) -> Result<(), StorageError> {
 fn validate_value(value: &[u8]) -> Result<(), StorageError> {
     if value.len() > MAX_VALUE_LEN {
         return Err(StorageError::LimitExceeded);
+    }
+    Ok(())
+}
+fn is_barrier_envelope(value: &[u8]) -> bool {
+    value.starts_with(BARRIER_ENVELOPE_MAGIC)
+}
+fn validate_generic_value(value: &[u8]) -> Result<(), StorageError> {
+    validate_value(value)?;
+    if is_barrier_envelope(value) {
+        return Err(StorageError::InvalidInput);
     }
     Ok(())
 }
@@ -1329,6 +1386,58 @@ mod tests {
         drop(table);
         drop(tx);
         drop(reopened);
+        remove(&file);
+    }
+
+    #[test]
+    fn generic_kv_rejects_fbe1_and_reconciliation_detects_legacy_value() {
+        let file = path();
+        {
+            let db = Builder::new()
+                .set_concurrency_mode(ConcurrencyMode::MultiWriter)
+                .create(&file)
+                .unwrap();
+            let mut tx = db.begin_write().unwrap();
+            tx.set_durability(Durability::Immediate).unwrap();
+            let mut table = tx.open_table(KV).unwrap();
+            let encoded = encode_versioned(1, &envelope(1));
+            table.insert(b"kv/legacy".as_slice(), encoded.as_slice()).unwrap();
+            drop(table);
+            tx.commit().unwrap();
+        }
+
+        let store = RedbStore::open(&file).unwrap();
+        let protected = envelope(1);
+        assert_eq!(
+            store.put(b"kv/not-a-barrier-record", &protected),
+            Err(StorageError::InvalidInput)
+        );
+        assert_eq!(
+            Mutation::put(b"kv/batch".to_vec(), protected.clone()),
+            Err(StorageError::InvalidInput)
+        );
+        let bypass = vec![Mutation::Put {
+            key: b"kv/batch".to_vec(),
+            value: protected,
+        }];
+        let conditions = vec![Precondition::new(b"kv/batch".to_vec(), None).unwrap()];
+        assert_eq!(
+            store.apply_batch(&bypass, &conditions),
+            Err(StorageError::InvalidInput)
+        );
+        assert_eq!(
+            store.has_dependencies(&key_id(), 1),
+            Err(KeyInventoryError::Incomplete)
+        );
+        assert_eq!(
+            store.confirm_inventory_reconciled(),
+            Err(StorageError::CorruptRecord)
+        );
+
+        assert!(store.delete(b"kv/legacy").unwrap());
+        store.confirm_inventory_reconciled().unwrap();
+        assert!(!store.has_dependencies(&key_id(), 1).unwrap());
+        drop(store);
         remove(&file);
     }
 
