@@ -172,20 +172,20 @@ Subphase dependencies are sequential where security decisions require it: 2.0 pr
 
 #### 2.0 — Owner decisions and API/security contract baseline
 
-**Decision register:** [Phase 2.0 owner decision register and contract baseline](docs/phase-2/decision-register.md). It records binding ADR constraints, a candidate operation inventory, route-security classification, logical interfaces, threat impacts, test mapping and owner decisions D2.0-01 through D2.0-11. D2.0-01 is approved in [ADR-0025](docs/adr/0025-dual-api-transports-shared-security-pipeline.md): HTTP/JSON and gRPC share one authoritative security pipeline. The remaining D2.0 choices are pending. The register is a review worksheet, not an ADR. **Current state: in progress; 2.0 remains open until the remaining required decisions are recorded or explicitly deferred.**
+**Decision register:** [Phase 2.0 owner decision register and contract baseline](docs/phase-2/decision-register.md) consolidates the existing owner-approved architecture into Community ADRs, operation inventory, route-security classifications, logical interfaces, threat impacts and test mapping. The approved model includes HTTP/JSON and gRPC behind one authoritative security pipeline (ADR-0005, clarified in ADR-0025), TLS 1.3/rustls, /v1 versioning, ordered authentication and rate-limit stages, canonical ACL, single tenant root, Shamir 2-of-3 default, and fail-closed durable audit. **Subphase 2.0 is a provenance/reconciliation task, not a request to re-decide this architecture.**
 
-**Scope:** resolve the owner-pending choices in §2.5; inventory the native endpoints and operations that Phase 2 will expose; classify each route by seal availability, authentication, authorization and audit requirements; record the resulting public interfaces and threat-model impact in ADRs. This is a design and approval gate, not permission to invent implementation defaults.
+**Scope:** consolidate and trace the previously owner-approved architecture decisions, operation catalog and security classifications into the public Community records. Use the complete approved design as the authority; do not reopen decisions because the Community ADR adaptation is concise. Record public interfaces, threat impact and tests. Raise a new ADR only for a demonstrable gap or conflict in the original approved baseline, not as a replacement for an existing decision.
 
 **Definition of Done:**
-- The native endpoint/operation catalog is reviewed and owner-approved, including explicit non-goals and deferred operations.
-- Transport, wire/schema format, credential model, identity lifecycle, ACL semantics, rate-limit policy, request limits, sealed-mode allowlist and audit details have decisions or explicit documented exclusions.
-- Every decision that changes an approved architecture requirement is recorded in a new or superseding owner-approved ADR; pending decisions remain visibly pending.
-- The request pipeline and its security invariants are mapped to tests and responsible subphases.
-- No implementation subphase relies on an unapproved credential format, authorization rule, numerical limit or audit durability assumption.
+- The complete owner-approved native endpoint/operation catalog and explicit exclusions are reproduced in the Community record.
+- Existing approved choices for transport/schema, credentials/identity, ACL, rate limits, request bounds, sealed-mode access, TLS lifecycle and audit are traced to their source ADRs; none is re-selected.
+- Any genuinely new or conflicting choice is isolated as a new decision only after the prior approval record has been checked.
+- The request pipeline and its existing security invariants are mapped to tests and responsible subphases.
+- No implementation subphase relies on guessed values or a replacement for an existing approval.
 
 #### 2.1 — Native `/v1` API and contract definitions
 
-**Scope:** define the native API route catalog, request/response schemas, error model, versioning behavior and compatibility rules. ADR-0015 already approves `/v1`, semantic versioning and a two-minor-version deprecation policy; this subphase must apply those decisions rather than redefine them. The exact endpoint list and wire format remain subject to 2.0.
+**Scope:** define the native API route catalog, request/response schemas, error model, versioning behavior and compatibility rules. ADR-0015 already approves `/v1`, semantic versioning and a two-minor-version deprecation policy; this subphase must apply those decisions rather than redefine them. The exact endpoint list and wire format must be carried over from the already approved design through subphase 2.0; they are not fresh decisions.
 
 **Definition of Done:**
 - Every Phase 2 endpoint has a documented method, canonical route, input/output schema, error behavior and security classification.
@@ -271,7 +271,7 @@ The following are required contract boundaries. These descriptions identify resp
 
 ### 2.5 Decisions that still require explicit owner approval
 
-The ADRs define required behavior but do not settle every implementation choice. The following must not be guessed:
+The owner has confirmed that these Phase 2 choices were already decided in the approved architecture. The Community ADRs are concise adaptations, so this section is a carryover/provenance checklist rather than an open decision list. Do not ask the owner to choose them again or replace them with new proposals:
 
 1. **Transport and server implementation:** whether Community exposes HTTP, gRPC or both in this phase; the concrete server framework; protocol mapping and any schema-generation technology.
 2. **Native API catalog:** exact resources, routes, methods and operations included in the Phase 2 MVP; request/response representation, pagination and error envelope details.
@@ -284,7 +284,7 @@ The ADRs define required behavior but do not settle every implementation choice.
 9. **Audit/state coordination:** transaction boundary and the outbox/idempotency/reconciliation mechanism to use when audit and protected state cannot commit atomically.
 10. **Service configuration and operations:** configuration source/format, secret handling for server credentials, health/readiness semantics, graceful shutdown and supported deployment assumptions.
 
-A decision may be deferred only if the dependent feature is disabled and the exclusion is explicit. Do not implement a permissive fallback to avoid an unresolved decision. Changes to owner-approved requirements need a new or superseding ADR.
+A missing reference in the Community adaptation must be resolved by locating/adapting the existing owner-approved source decision. It must not be converted into a fresh owner question by default. If and only if the complete authoritative baseline has no answer or contains a true conflict, isolate that specific gap for owner review.
 
 ### 2.6 Required test and evidence strategy
 
