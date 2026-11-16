@@ -93,7 +93,8 @@ Hard bounds may be equal to defaults for parser-facing maximums. An operator may
 | AppRole Secret ID TTL | 86,400 seconds default; 2,592,000 seconds maximum |
 | AppRole Secret ID uses | 1 default; 10 maximum |
 | AppRole role token TTL | 900 seconds default; 3,600 seconds maximum |
-| Bootstrap token TTL | 300 seconds; one use |
+| Local bootstrap token TTL | 300 seconds; one use |
+| Restricted setup token TTL | 900 seconds; one use |
 | Unseal session TTL | 300 seconds; one active session |
 | Root-operation approval TTL | 300 seconds |
 
