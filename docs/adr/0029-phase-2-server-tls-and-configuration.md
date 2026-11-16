@@ -13,6 +13,7 @@
 - Certificate/key/CRL reload is atomic: validate a complete candidate before swapping. An invalid reload keeps the previous known-good snapshot and emits a security/health event.
 - Service configuration is strict TOML. Unknown/duplicate keys, unsafe paths, invalid types and out-of-range security settings fail startup. Root operations additionally require explicit `[ceremony.root_quorum]` values `threshold = 2` and `total_shares = 3`; missing/invalid values disable root operations and never select a fallback. At most one root operation may be active. The precedence is safe compiled defaults, file, documented non-secret environment overrides, then non-secret CLI flags.
 - Secret values are never read from command-line arguments or environment overrides; configuration contains file references only. Sensitive directories/files have restrictive ownership/modes and reject symlink traversal.
+- The local bootstrap credential defaults to 5 minutes; the restricted setup credential defaults to 15 minutes and can invoke only the single atomic bootstrap-completion operation. It is consumed only when initialization commits.
 - Only TLS certificate/key and client revocation/trust bundle material may hot-reload in Phase 2. Other security-sensitive settings require restart.
 - Graceful shutdown stops accepting requests, drains for at most 30 seconds, propagates cancellation and durably reconciles sensitive in-flight operations.
 
