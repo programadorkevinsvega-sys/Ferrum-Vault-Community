@@ -13,3 +13,14 @@ targetRules = ["generic-api-key"]
 paths = ['''^crates/crypto/tests/vectors/aes_gcm_test\.json$''']
 regexTarget = "line"
 regexes = ['''^\s*"key":\s*"([0-9a-f]{32}|[0-9a-f]{48}|[0-9a-f]{64})",?$''']
+
+# This exact historical prose line in the Phase 2 carryover document was
+# classified as generic-api-key. It contains no credential value. Keep the
+# exception bound to that one commit, file, rule and complete line.
+[[allowlists]]
+description = "Exact historical Phase 2 documentation false positive; no secret value"
+targetRules = ["generic-api-key"]
+commits = ["89a5a89fb1ee97d9b2b7f1fece0fd036b3d596be"]
+paths = ['''^docs/phase-2/approved-design-carryover\.md$''']
+regexTarget = "line"
+regexes = ['''^- Exact token/credential representations, persistence/validation rules, principal fields and lifecycle durations beyond the one-time bootstrap and stated lifecycle protections\.$''']
