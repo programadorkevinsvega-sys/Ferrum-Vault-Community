@@ -113,7 +113,7 @@ The owner has stated that the Phase 2 architecture choices were already made. Th
 Phase 2.0 must locate and reproduce the previously approved values for the following items before implementation relies on them:
 
 - Exact native HTTP route names, methods, request/response schemas, gRPC service/RPC names and cross-transport error mapping.
-- Exact token/credential representations, persistence/validation rules, principal fields and lifecycle durations beyond the one-time bootstrap and stated lifecycle protections.
+- Per-method authentication-material formats, server-side persistence/validation rules, principal attributes and lifecycle durations beyond the one-time bootstrap and stated protections.
 - The full ACL grammar, capability vocabulary and rule precedence.
 - Numerical request limits, rate-limit algorithms/quotas/windows/bursts and trusted-proxy configuration.
 - Exact sealed-mode endpoint and response-field allowlist.
