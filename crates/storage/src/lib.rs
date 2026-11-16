@@ -321,7 +321,7 @@ impl KvBackend for RedbStore {
         if prefix.len() > MAX_KEY_LEN || limit == 0 || limit > 10_000 {
             return Err(StorageError::InvalidInput);
         }
-        let after = cursor.map(|c| decode_cursor(prefix, c)).transpose()?.flatten();
+        let after = cursor.map(|c| decode_cursor(prefix, c)).transpose()?;
         let tx = self.database.begin_read().map_err(|_| StorageError::Unavailable)?;
         let table = tx.open_table(KV).map_err(|_| StorageError::Unavailable)?;
         let mut records = Vec::with_capacity(limit.min(256));
