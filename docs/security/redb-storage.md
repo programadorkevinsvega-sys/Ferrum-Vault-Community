@@ -21,7 +21,7 @@ The following updates each share one transaction:
 
 ## Key dependency completeness
 
-The index tracks live FBE1 records. Backup, snapshot and active rotation-job references are registered explicitly and removed only after the external artifact/job is removed or migrated. `KeyDependencyInventory::has_dependencies` returns an incomplete-inventory error until an operator/integration has reconciled live data and all retained external artifacts.
+The index tracks live FBE1 records. Backup, snapshot and active rotation-job references are registered explicitly and removed only after the external artifact/job is removed or migrated. `KeyDependencyInventory::has_dependencies` returns an incomplete-inventory error until an operator/integration has reconciled live data and all retained external artifacts. When it returns `Ok(false)`, it also writes a durable per-key-version retirement fence in the same writer transaction. FBE1 writes, rotation CAS replacements and new external-reference registrations check that fence transactionally, so they cannot race a dependency into existence after the retirement decision.
 
 A database with existing barrier records but no completeness marker fails closed. Read or metadata errors also fail closed. Never retire a DEK from an incomplete or unavailable inventory.
 
