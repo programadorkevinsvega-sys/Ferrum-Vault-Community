@@ -1326,7 +1326,7 @@ mod tests {
                 .set_concurrency_mode(ConcurrencyMode::MultiWriter)
                 .create(&file)
                 .unwrap();
-            let tx = db.begin_write().unwrap();
+            let mut tx = db.begin_write().unwrap();
             tx.set_durability(Durability::Immediate).unwrap();
             let mut table = tx.open_table(BARRIER).unwrap();
             table
