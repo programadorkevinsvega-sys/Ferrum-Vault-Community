@@ -136,7 +136,8 @@ message TokenAuth {
 }
 
 message TokenResponse {
-  TokenAuth auth = 1;
+  TokenAuth auth = 1; // When replayed=true, auth.client_token is empty and accessor identifies the issued token.
+  bool replayed = 2;
 }
 
 message TokenMetadata {
@@ -235,7 +236,7 @@ message CreateSecretIdRequest {
 
 message SecretIdResponse {
   string secret_id = 1; // fvsa_ prefix plus 32 random bytes encoded as unpadded base64url; returned once.
-  string accessor = 2; // Non-secret 128-bit handle, also returned on an idempotency replay.
+  string accessor = 2; // Non-secret 128-bit handle.
   google.protobuf.Timestamp expires_at = 3;
   uint32 uses = 4;
   bool replayed = 5; // If true, secret_id is empty and the accessor identifies the prior issuance.
