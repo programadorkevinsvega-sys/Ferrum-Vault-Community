@@ -976,7 +976,9 @@ impl RotationStore for RedbStore {
         )
         .map_err(|_| RotationStoreError::CorruptState)?;
         let persist_dependency = match event.kind() {
-            RotationAuditKind::Started | RotationAuditKind::Checkpointed if !checkpoint.is_complete() => {
+            RotationAuditKind::Started | RotationAuditKind::Checkpointed
+                if !checkpoint.is_complete() =>
+            {
                 true
             }
             RotationAuditKind::Completed if checkpoint.is_complete() => false,
