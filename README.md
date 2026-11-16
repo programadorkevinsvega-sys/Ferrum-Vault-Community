@@ -4,9 +4,9 @@ Ferrum is a project in development for secrets management, encryption services a
 
 ## Project status
 
-**Early implementation / not production-ready.** The Community repository now contains isolated Rust crates for the AWS-LC cryptographic boundary, offline Shamir recovery and the Phase 1.4 seal/bootstrap state machine. It does not yet contain a complete runtime, durable seal-state backend, server/API or CLI. Do not use it to store, protect or process production secrets.
+**Phase 1 foundation complete and owner-accepted; not production-ready.** Community `main` contains the Phase 1.1–1.7 libraries and contracts: AWS-LC cryptography, key-management provider boundary, offline Shamir recovery, seal/bootstrap and quorum controls, the provider-neutral Unsealer with an optional disabled-by-default AWS KMS adapter, barrier encryption/AAD/rotation contracts, and the durable redb storage backend. These are library-level components; they are not yet composed into a complete runnable server or native API. Phase 2 defines that service work. The Community CLI and later engines remain in their separate roadmap phases.
 
-Do not use this project to store, protect or process production secrets. It has not been independently audited or FIPS validated.
+Do not use this project to store, protect or process production secrets. The seal controller and durable storage adapter are separate components pending Phase 2 service composition. The project has not been independently audited and has no FIPS validation. Passing CI is not a production-readiness claim.
 
 ## Community and Enterprise
 
