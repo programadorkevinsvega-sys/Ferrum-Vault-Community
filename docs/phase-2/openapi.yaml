@@ -86,6 +86,31 @@ paths:
         '409': { $ref: '#/components/responses/Conflict' }
         '401': { $ref: '#/components/responses/Unauthorized' }
         '503': { $ref: '#/components/responses/Unavailable' }
+  /v1/sys/bootstrap/complete:
+    post:
+      operationId: CompleteBootstrap
+      tags: [System]
+      security:
+        - bootstrapSetupAuth: []
+      summary: Atomically create the first identity and initial ACL policy
+      description: Available only after unseal and before initialization. Consumes a 15-minute fvst_ setup token once, creates one password identity and one initial ACL policy in one atomic operation, assigns the policy, marks the service initialized and revokes the setup token.
+      parameters:
+        - $ref: '#/components/parameters/IdempotencyKey'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/BootstrapCompletionRequest' }
+      responses:
+        '201':
+          description: Initial identity and policy created; the setup credential is revoked.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/BootstrapCompletionResponse' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '409': { $ref: '#/components/responses/Conflict' }
+        '503': { $ref: '#/components/responses/Unavailable' }
   /v1/sys/unseal/sessions:
     post:
       operationId: CreateUnsealSession
@@ -631,6 +656,10 @@ components:
       type: http
       scheme: bearer
       bearerFormat: FerrumOpaqueToken
+    bootstrapSetupAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: FerrumOneTimeSetupToken
     mutualTLS:
       type: mutualTLS
   parameters:
@@ -781,13 +810,32 @@ components:
       additionalProperties: false
     BootstrapConsumeResponse:
       type: object
-      required: [bootstrapToken, expiresAt, capabilities]
+      required: [setupToken, expiresAt, capabilities]
       properties:
-        bootstrapToken: { type: string, minLength: 48, maxLength: 48, pattern: '^fvbt_[A-Za-z0-9_-]{43}$' }
+        setupToken: { type: string, minLength: 48, maxLength: 48, pattern: '^fvst_[A-Za-z0-9_-]{43}$' }
         expiresAt: { type: string, format: date-time }
         capabilities:
           type: array
-          items: { type: string, enum: [create_first_password_identity, create_initial_acl_policy] }
+          items: { type: string, enum: [complete_bootstrap] }
+      additionalProperties: false
+    BootstrapCompletionRequest:
+      type: object
+      required: [username, password, policyName, initialPolicy]
+      properties:
+        username: { type: string, pattern: '^[a-z0-9][a-z0-9._-]{2,63}$' }
+        password: { type: string, minLength: 1, maxLength: 1024, writeOnly: true, description: UTF-8 encoded length must be 12 to 1024 bytes; server validates byte length. }
+        policyName: { type: string, const: bootstrap-admin }
+        initialPolicy: { $ref: '#/components/schemas/AclPolicyInput' }
+      additionalProperties: false
+    BootstrapCompletionResponse:
+      type: object
+      required: [initialized, userId, username, policyName, policyRevision]
+      properties:
+        initialized: { type: boolean, const: true }
+        userId: { type: string, format: uuid }
+        username: { type: string }
+        policyName: { type: string, const: bootstrap-admin }
+        policyRevision: { type: integer, const: 1 }
       additionalProperties: false
     UnsealSession:
       type: object
