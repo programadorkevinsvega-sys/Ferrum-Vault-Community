@@ -308,6 +308,7 @@ paths:
         '401': { $ref: '#/components/responses/Unauthorized' }
         '403': { $ref: '#/components/responses/Forbidden' }
         '412': { $ref: '#/components/responses/PreconditionFailed' }
+        '428': { $ref: '#/components/responses/PreconditionRequired' }
     delete:
       operationId: DeletePasswordUser
       tags: [Identity]
@@ -319,6 +320,7 @@ paths:
         '401': { $ref: '#/components/responses/Unauthorized' }
         '403': { $ref: '#/components/responses/Forbidden' }
         '404': { $ref: '#/components/responses/NotFound' }
+        '428': { $ref: '#/components/responses/PreconditionRequired' }
   /v1/sys/auth/approle/roles:
     get:
       operationId: ListRoles
@@ -394,6 +396,7 @@ paths:
         '403': { $ref: '#/components/responses/Forbidden' }
         '404': { $ref: '#/components/responses/NotFound' }
         '412': { $ref: '#/components/responses/PreconditionFailed' }
+        '428': { $ref: '#/components/responses/PreconditionRequired' }
     delete:
       operationId: DeleteRole
       tags: [AppRole]
@@ -486,8 +489,8 @@ paths:
         '400': { $ref: '#/components/responses/BadRequest' }
         '401': { $ref: '#/components/responses/Unauthorized' }
         '403': { $ref: '#/components/responses/Forbidden' }
-        '428': { $ref: '#/components/responses/PreconditionRequired' }
         '412': { $ref: '#/components/responses/PreconditionFailed' }
+        '428': { $ref: '#/components/responses/PreconditionRequired' }
     delete:
       operationId: DeletePolicy
       tags: [Policies]
@@ -499,8 +502,8 @@ paths:
         '401': { $ref: '#/components/responses/Unauthorized' }
         '403': { $ref: '#/components/responses/Forbidden' }
         '404': { $ref: '#/components/responses/NotFound' }
-        '428': { $ref: '#/components/responses/PreconditionRequired' }
         '412': { $ref: '#/components/responses/PreconditionFailed' }
+        '428': { $ref: '#/components/responses/PreconditionRequired' }
   /v1/sys/root-operations:
     post:
       operationId: BeginOperation
@@ -599,19 +602,19 @@ components:
       name: If-Match
       in: header
       required: true
-      description: Current opaque ETag/revision for mutation of an existing resource.
+      description: Current opaque ETag/revision for an existing resource.
       schema: { type: string, minLength: 1, maxLength: 128 }
     IfMatchOptional:
       name: If-Match
       in: header
       required: false
-      description: Required for update; mutually exclusive with If-None-Match.
+      description: Supply this for an update; mutually exclusive with If-None-Match.
       schema: { type: string, minLength: 1, maxLength: 128 }
     IfNoneMatch:
       name: If-None-Match
       in: header
       required: false
-      description: Must be '*' when creating a resource; mutually exclusive with If-Match.
+      description: Supply '*' for creation; mutually exclusive with If-Match.
       schema: { type: string, const: '*' }
     SessionId:
       name: sessionId
@@ -678,7 +681,7 @@ components:
         application/problem+json:
           schema: { $ref: '#/components/schemas/Problem' }
     PreconditionRequired:
-      description: A conditional create/update header was omitted or both were supplied.
+      description: Missing or conflicting conditional request headers.
       content:
         application/problem+json:
           schema: { $ref: '#/components/schemas/Problem' }
@@ -772,7 +775,7 @@ components:
       required: [roleId, secretId]
       properties:
         roleId: { type: string, minLength: 22, maxLength: 22 }
-        secretId: { type: string, minLength: 48, maxLength: 48, pattern: '^fvsa_[A-Za-z0-9_-]{43}
+        secretId: { type: string, minLength: 43, maxLength: 64, writeOnly: true }
       additionalProperties: false
     TokenResponse:
       type: object
@@ -853,6 +856,7 @@ components:
           items: { type: string }
         createdAt: { type: string, format: date-time }
         updatedAt: { type: string, format: date-time }
+        revision: { type: integer, minimum: 1 }
       additionalProperties: false
     AppRoleDefinition:
       type: object
@@ -902,7 +906,7 @@ components:
       type: object
       required: [secretId, expiresAt, uses]
       properties:
-        secretId: { type: string }
+        secretId: { type: string, minLength: 48, maxLength: 48, pattern: '^fvsa_[A-Za-z0-9_-]{43}
         expiresAt: { type: string, format: date-time }
         uses: { type: integer, minimum: 1, maximum: 10 }
       additionalProperties: false
@@ -1701,137 +1705,7 @@ components:
         oldestPendingSeconds: { type: integer, minimum: 0 }
         lastSequence: { type: string, pattern: '^[0-9]+$' }
       additionalProperties: false
-, writeOnly: true }
-      additionalProperties: false
-    TokenResponse:
-      type: object
-      required: [auth]
-      properties:
-        auth:
-          type: object
-          required: [clientToken, accessor, tokenType, expiresAt, renewable, principalId, policies]
-          properties:
-            clientToken: { type: string, pattern: '^fvct_[A-Za-z0-9_-]{43}
-            accessor: { type: string, minLength: 22, maxLength: 22 }
-            tokenType: { type: string, const: Bearer }
-            expiresAt: { type: string, format: date-time }
-            renewable: { type: boolean }
-            principalId: { type: string, format: uuid }
-            policies:
-              type: array
-              items: { type: string }
-          additionalProperties: false
-      additionalProperties: false
-    TokenMetadata:
-      type: object
-      required: [accessor, principalId, expiresAt, renewable, policies]
-      properties:
-        accessor: { type: string, minLength: 22, maxLength: 22 }
-        principalId: { type: string, format: uuid }
-        expiresAt: { type: string, format: date-time }
-        renewable: { type: boolean }
-        policies:
-          type: array
-          items: { type: string }
-      additionalProperties: false
-    CreateTokenRequest:
-      type: object
-      required: [policies]
-      properties:
-        policies:
-          type: array
-          minItems: 1
-          maxItems: 32
-          uniqueItems: true
-          items: { type: string, pattern: '^[a-z0-9][a-z0-9._-]{0,62}$' }
-        ttlSeconds: { type: integer, minimum: 1, maximum: 28800 }
-      additionalProperties: false
-    CreatePasswordUserRequest:
-      type: object
-      required: [username, password, policies]
-      properties:
-        username: { type: string, pattern: '^[a-z0-9][a-z0-9._-]{2,63}$' }
-        password: { type: string, minLength: 12, maxLength: 1024, writeOnly: true }
-        policies:
-          type: array
-          minItems: 1
-          maxItems: 32
-          uniqueItems: true
-          items: { type: string }
-      additionalProperties: false
-    UpdatePasswordUserRequest:
-      type: object
-      properties:
-        password: { type: string, minLength: 12, maxLength: 1024, writeOnly: true }
-        policies:
-          type: array
-          minItems: 1
-          maxItems: 32
-          uniqueItems: true
-          items: { type: string }
-      minProperties: 1
-      additionalProperties: false
-    PasswordUser:
-      type: object
-      required: [userId, username, policies, createdAt, updatedAt]
-      properties:
-        userId: { type: string, format: uuid }
-        username: { type: string }
-        policies:
-          type: array
-          items: { type: string }
-        createdAt: { type: string, format: date-time }
-        updatedAt: { type: string, format: date-time }
-      additionalProperties: false
-    AppRoleDefinition:
-      type: object
-      required: [name, policies]
-      properties:
-        name: { type: string, pattern: '^[a-z0-9][a-z0-9._-]{0,62}$' }
-        policies:
-          type: array
-          minItems: 1
-          maxItems: 32
-          uniqueItems: true
-          items: { type: string }
-        secretIdTtlSeconds: { type: integer, minimum: 1, maximum: 2592000, default: 86400 }
-        secretIdNumUses: { type: integer, minimum: 1, maximum: 10, default: 1 }
-        tokenTtlSeconds: { type: integer, minimum: 1, maximum: 3600, default: 900 }
-        cidrAllowlist:
-          type: array
-          maxItems: 64
-          uniqueItems: true
-          items: { type: string }
-      additionalProperties: false
-    AppRole:
-      allOf:
-        - $ref: '#/components/schemas/AppRoleDefinition'
-        - type: object
-          required: [roleId, createdAt, revision]
-          properties:
-            roleId: { type: string, minLength: 22, maxLength: 22 }
-            createdAt: { type: string, format: date-time }
-            revision: { type: integer, minimum: 1 }
-    AppRoleList:
-      type: object
-      required: [roles]
-      properties:
-        roles:
-          type: array
-          items: { $ref: '#/components/schemas/AppRole' }
-        nextPageToken: { type: string, maxLength: 2048 }
-      additionalProperties: false
-    CreateSecretIdRequest:
-      type: object
-      properties:
-        ttlSeconds: { type: integer, minimum: 1, maximum: 2592000 }
-        numUses: { type: integer, minimum: 1, maximum: 10 }
-      additionalProperties: false
-    SecretIdResponse:
-      type: object
-      required: [secretId, expiresAt, uses]
-      properties:
-        secretId: { type: string }
+ }
         expiresAt: { type: string, format: date-time }
         uses: { type: integer, minimum: 1, maximum: 10 }
       additionalProperties: false
