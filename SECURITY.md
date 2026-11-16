@@ -2,9 +2,9 @@
 
 ## Project status
 
-Ferrum Vault Community is in early implementation, not a production secrets manager. The repository contains isolated cryptographic, offline recovery and process-local seal/bootstrap crates, but it does not yet contain a complete service, durable seal-state backend, server/API or CLI. The seal controller is volatile and is not restart-safe or multi-process. Do not use this project to store or process production secrets.
+Ferrum Vault Community has completed and owner-accepted the Phase 1 library foundation; it is not a production secrets manager. The repository contains cryptographic/key-management and barrier contracts, offline Shamir recovery, seal/bootstrap and Unsealer components, an optional disabled-by-default AWS KMS adapter, and a durable redb storage adapter. The seal controller and storage adapter remain separate library components: the full service lifecycle, native server/API, authentication, ACL enforcement and durable audit pipeline have not yet been composed. There is no CLI.
 
-The project has not been independently audited and has no FIPS validation. Passing CI is not an external security audit or a production-readiness claim.
+Do not use this project to store or process production secrets. The project has not been independently audited and has no FIPS validation. Passing CI is not an external security audit or a production-readiness claim.
 
 ## Vulnerability reporting
 
