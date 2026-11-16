@@ -47,6 +47,7 @@ The adaptations are written in English for public documentation. Decisions with 
 | [0022](0022-server-distribution.md) | 0022 | Server distribution | Owner-approved |
 | [0023](0023-cli-distribution.md) | 0023 | CLI distribution | Owner-approved |
 | [0024](0024-unsealer-port-and-optional-aws-kms.md) | 0024 | Unsealer port and optional AWS KMS adapter | Owner-approved |
+| [0025](0025-dual-api-transports-shared-security-pipeline.md) | 0025 | Dual native API transports with a shared security pipeline | Owner-approved |
 
 ## Change control
 
