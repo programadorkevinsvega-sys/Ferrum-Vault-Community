@@ -1,0 +1,949 @@
+openapi: 3.2.1
+info:
+  title: Ferrum Vault Community Native API
+  version: 1.0.0
+  summary: Native Community HTTP/JSON API for Phase 2
+  description: |
+    This contract is the HTTP representation of the shared Phase 2 operation model.
+    All operations enter the ADR-0005 security pipeline. The authoritative operation,
+    ACL and audit semantics are documented in service-contract.md.
+servers:
+  - url: https://localhost:8443
+    description: Default local TLS listener
+security:
+  - bearerAuth: []
+  - mutualTLS: []
+tags:
+  - name: System
+  - name: Authentication
+  - name: Tokens
+  - name: Identity
+  - name: AppRole
+  - name: Policies
+  - name: Root operations
+  - name: Audit
+paths:
+  /v1/sys/health/live:
+    get:
+      operationId: GetLiveness
+      tags: [System]
+      security: []
+      summary: Process liveness
+      responses:
+        '200':
+          description: The process is alive.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/HealthResponse' }
+        '429': { $ref: '#/components/responses/RateLimited' }
+  /v1/sys/health/ready:
+    get:
+      operationId: GetReadiness
+      tags: [System]
+      security: []
+      summary: Service readiness
+      responses:
+        '200':
+          description: The service can accept protected operations.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/HealthResponse' }
+        '503':
+          description: Sealed, clock unsafe, audit unavailable or dependency not ready.
+          content:
+            application/problem+json:
+              schema: { $ref: '#/components/schemas/Problem' }
+  /v1/sys/seal-status:
+    get:
+      operationId: GetSealStatus
+      tags: [System]
+      security: []
+      summary: Minimal seal status
+      responses:
+        '200':
+          description: Minimal non-secret state only.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/SealStatus' }
+  /v1/sys/bootstrap/consume:
+    post:
+      operationId: ConsumeBootstrapToken
+      tags: [System]
+      security: []
+      summary: Consume the one-time bootstrap token
+      description: Available only while uninitialized. The bootstrap token is single-use, 5-minute and never returned by a read operation.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/BootstrapConsumeRequest' }
+      responses:
+        '200':
+          description: One-time setup token. It may only create the first password identity and initial ACL policy.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/BootstrapConsumeResponse' }
+        '409': { $ref: '#/components/responses/Conflict' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '503': { $ref: '#/components/responses/Unavailable' }
+  /v1/sys/unseal/sessions:
+    post:
+      operationId: CreateUnsealSession
+      tags: [System]
+      security: []
+      summary: Start a sealed-mode unseal ceremony
+      description: Only one volatile session can exist. It expires after five minutes and holds no data on disk.
+      responses:
+        '201':
+          description: Unseal session created.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/UnsealSession' }
+        '409': { $ref: '#/components/responses/Conflict' }
+        '429': { $ref: '#/components/responses/RateLimited' }
+  /v1/sys/unseal/sessions/{sessionId}/shares:
+    post:
+      operationId: SubmitUnsealShare
+      tags: [System]
+      security: []
+      summary: Submit one FRS1 unseal share
+      parameters:
+        - $ref: '#/components/parameters/SessionId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/ShareSubmission' }
+      responses:
+        '202':
+          description: Share accepted; the ceremony remains sealed.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ShareProgress' }
+        '200':
+          description: A valid 2-of-3 ceremony completed and the service is unsealed.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ShareProgress' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '409': { $ref: '#/components/responses/Conflict' }
+        '429': { $ref: '#/components/responses/RateLimited' }
+  /v1/sys/seal:
+    post:
+      operationId: Seal
+      tags: [System]
+      summary: Seal the service
+      parameters:
+        - $ref: '#/components/parameters/IdempotencyKey'
+      responses:
+        '204': { description: Service sealed. }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '503': { $ref: '#/components/responses/Unavailable' }
+  /v1/auth/password/login:
+    post:
+      operationId: PasswordLogin
+      tags: [Authentication]
+      security: []
+      summary: Authenticate with username and password
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/PasswordLoginRequest' }
+      responses:
+        '200':
+          description: Short-lived opaque access token.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/TokenResponse' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '429': { $ref: '#/components/responses/RateLimited' }
+        '503': { $ref: '#/components/responses/Unavailable' }
+  /v1/auth/approle/login:
+    post:
+      operationId: AppRoleLogin
+      tags: [Authentication]
+      security: []
+      summary: Authenticate with AppRole
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/AppRoleLoginRequest' }
+      responses:
+        '200':
+          description: Short-lived opaque access token.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/TokenResponse' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '429': { $ref: '#/components/responses/RateLimited' }
+        '503': { $ref: '#/components/responses/Unavailable' }
+  /v1/auth/token/lookup-self:
+    post:
+      operationId: LookupSelf
+      tags: [Tokens]
+      summary: Inspect the current token metadata
+      responses:
+        '200':
+          description: Current token metadata; never includes the token secret.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/TokenMetadata' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+  /v1/auth/token/renew-self:
+    post:
+      operationId: RenewSelf
+      tags: [Tokens]
+      parameters:
+        - $ref: '#/components/parameters/IdempotencyKey'
+      responses:
+        '200':
+          description: Old token revoked; new token returned once.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/TokenResponse' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '409': { $ref: '#/components/responses/Conflict' }
+  /v1/auth/token/revoke-self:
+    post:
+      operationId: RevokeSelf
+      tags: [Tokens]
+      parameters:
+        - $ref: '#/components/parameters/IdempotencyKey'
+      responses:
+        '204': { description: Current token revoked. }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+  /v1/sys/auth/tokens:
+    post:
+      operationId: CreateToken
+      tags: [Tokens]
+      summary: Create a child token
+      parameters:
+        - $ref: '#/components/parameters/IdempotencyKey'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/CreateTokenRequest' }
+      responses:
+        '201':
+          description: Newly created token secret; shown once.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/TokenResponse' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '503': { $ref: '#/components/responses/Unavailable' }
+  /v1/sys/auth/tokens/{accessor}:
+    delete:
+      operationId: RevokeToken
+      tags: [Tokens]
+      summary: Revoke a token by its non-secret accessor
+      parameters:
+        - $ref: '#/components/parameters/Accessor'
+        - $ref: '#/components/parameters/IdempotencyKey'
+      responses:
+        '204': { description: Token and dependent child tokens revoked. }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+  /v1/sys/auth/password/users:
+    post:
+      operationId: CreatePasswordUser
+      tags: [Identity]
+      parameters:
+        - $ref: '#/components/parameters/IdempotencyKey'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/CreatePasswordUserRequest' }
+      responses:
+        '201':
+          description: User created. Password and password hash are never returned.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/PasswordUser' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '409': { $ref: '#/components/responses/Conflict' }
+  /v1/sys/auth/password/users/{userId}:
+    parameters:
+      - $ref: '#/components/parameters/UserId'
+    get:
+      operationId: GetPasswordUser
+      tags: [Identity]
+      responses:
+        '200':
+          description: Non-secret user metadata.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/PasswordUser' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+    patch:
+      operationId: UpdatePasswordUser
+      tags: [Identity]
+      parameters:
+        - $ref: '#/components/parameters/IdempotencyKey'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/UpdatePasswordUserRequest' }
+      responses:
+        '200':
+          description: Updated non-secret user metadata.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/PasswordUser' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '412': { $ref: '#/components/responses/PreconditionFailed' }
+    delete:
+      operationId: DeletePasswordUser
+      tags: [Identity]
+      parameters:
+        - $ref: '#/components/parameters/IdempotencyKey'
+      responses:
+        '204': { description: Password identity deleted and associated credentials revoked. }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+  /v1/sys/auth/approle/roles:
+    get:
+      operationId: ListRoles
+      tags: [AppRole]
+      responses:
+        '200':
+          description: AppRole names and non-secret configuration.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/AppRoleList' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+    post:
+      operationId: CreateRole
+      tags: [AppRole]
+      parameters:
+        - $ref: '#/components/parameters/IdempotencyKey'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/AppRoleDefinition' }
+      responses:
+        '201':
+          description: AppRole created; no Secret ID is generated by this operation.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/AppRole' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '409': { $ref: '#/components/responses/Conflict' }
+  /v1/sys/auth/approle/roles/{name}:
+    parameters:
+      - $ref: '#/components/parameters/RoleName'
+    get:
+      operationId: GetRole
+      tags: [AppRole]
+      responses:
+        '200':
+          description: Non-secret AppRole configuration.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/AppRole' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+    put:
+      operationId: UpdateRole
+      tags: [AppRole]
+      parameters:
+        - $ref: '#/components/parameters/IdempotencyKey'
+        - $ref: '#/components/parameters/IfMatch'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/AppRoleDefinition' }
+      responses:
+        '200':
+          description: AppRole updated.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/AppRole' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '412': { $ref: '#/components/responses/PreconditionFailed' }
+    delete:
+      operationId: DeleteRole
+      tags: [AppRole]
+      parameters:
+        - $ref: '#/components/parameters/IdempotencyKey'
+      responses:
+        '204': { description: AppRole and its active Secret IDs revoked. }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+  /v1/sys/auth/approle/roles/{name}/secret-ids:
+    post:
+      operationId: CreateSecretId
+      tags: [AppRole]
+      parameters:
+        - $ref: '#/components/parameters/RoleName'
+        - $ref: '#/components/parameters/IdempotencyKey'
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/CreateSecretIdRequest' }
+      responses:
+        '201':
+          description: Secret ID shown exactly once.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/SecretIdResponse' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+  /v1/sys/policies/acl:
+    get:
+      operationId: ListPolicies
+      tags: [Policies]
+      responses:
+        '200':
+          description: ACL policy names and revisions.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/PolicyList' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+  /v1/sys/policies/acl/{name}:
+    parameters:
+      - $ref: '#/components/parameters/PolicyName'
+    get:
+      operationId: GetPolicy
+      tags: [Policies]
+      responses:
+        '200':
+          description: ACL policy.
+          headers:
+            ETag:
+              schema: { type: string }
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/AclPolicy' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+    put:
+      operationId: PutPolicy
+      tags: [Policies]
+      parameters:
+        - $ref: '#/components/parameters/IdempotencyKey'
+        - $ref: '#/components/parameters/IfMatch'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/AclPolicyInput' }
+      responses:
+        '200':
+          description: Policy created or updated using compare-and-swap revision.
+          headers:
+            ETag:
+              schema: { type: string }
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/AclPolicy' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '412': { $ref: '#/components/responses/PreconditionFailed' }
+    delete:
+      operationId: DeletePolicy
+      tags: [Policies]
+      parameters:
+        - $ref: '#/components/parameters/IdempotencyKey'
+        - $ref: '#/components/parameters/IfMatch'
+      responses:
+        '204': { description: Policy deleted using compare-and-swap revision. }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '412': { $ref: '#/components/responses/PreconditionFailed' }
+  /v1/sys/root-operations:
+    post:
+      operationId: BeginOperation
+      tags: [Root operations]
+      parameters:
+        - $ref: '#/components/parameters/IdempotencyKey'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/BeginRootOperationRequest' }
+      responses:
+        '201':
+          description: Root operation challenge created. It expires after five minutes.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/RootOperation' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '409': { $ref: '#/components/responses/Conflict' }
+  /v1/sys/root-operations/{operationId}:
+    parameters:
+      - $ref: '#/components/parameters/OperationId'
+    get:
+      operationId: GetOperation
+      tags: [Root operations]
+      responses:
+        '200':
+          description: Root operation state; never includes approval shares.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/RootOperation' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+  /v1/sys/root-operations/{operationId}/approvals:
+    post:
+      operationId: ApproveOperation
+      tags: [Root operations]
+      parameters:
+        - $ref: '#/components/parameters/OperationId'
+        - $ref: '#/components/parameters/IdempotencyKey'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/ShareSubmission' }
+      responses:
+        '202':
+          description: One distinct valid quorum share accepted; operation remains pending.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/RootOperation' }
+        '200':
+          description: The 2-of-3 quorum was satisfied and operation completed.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/RootOperation' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '409': { $ref: '#/components/responses/Conflict' }
+  /v1/sys/audit/status:
+    get:
+      operationId: GetAuditStatus
+      tags: [Audit]
+      responses:
+        '200':
+          description: Redacted audit health and outbox status.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/AuditStatus' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: FerrumOpaqueToken
+    mutualTLS:
+      type: mutualTLS
+  parameters:
+    IdempotencyKey:
+      name: Idempotency-Key
+      in: header
+      required: true
+      description: 16 random bytes encoded as unpadded base64url; scoped to principal and operation for 24 hours.
+      schema:
+        type: string
+        minLength: 22
+        maxLength: 22
+        pattern: '^[A-Za-z0-9_-]{22}$'
+    IfMatch:
+      name: If-Match
+      in: header
+      required: true
+      description: Current opaque ETag/revision.
+      schema: { type: string, minLength: 1, maxLength: 128 }
+    SessionId:
+      name: sessionId
+      in: path
+      required: true
+      schema: { type: string, format: uuid }
+    Accessor:
+      name: accessor
+      in: path
+      required: true
+      schema: { type: string, minLength: 22, maxLength: 22 }
+    UserId:
+      name: userId
+      in: path
+      required: true
+      schema: { type: string, format: uuid }
+    RoleName:
+      name: name
+      in: path
+      required: true
+      schema: { type: string, pattern: '^[a-z0-9][a-z0-9._-]{0,62}$' }
+    PolicyName:
+      name: name
+      in: path
+      required: true
+      schema: { type: string, pattern: '^[a-z0-9][a-z0-9._-]{0,62}$' }
+    OperationId:
+      name: operationId
+      in: path
+      required: true
+      schema: { type: string, format: uuid }
+  responses:
+    BadRequest:
+      description: Invalid request or schema.
+      content:
+        application/problem+json:
+          schema: { $ref: '#/components/schemas/Problem' }
+    Unauthorized:
+      description: Missing or invalid authentication.
+      headers:
+        WWW-Authenticate:
+          schema: { type: string }
+      content:
+        application/problem+json:
+          schema: { $ref: '#/components/schemas/Problem' }
+    Forbidden:
+      description: Authenticated but not authorized.
+      content:
+        application/problem+json:
+          schema: { $ref: '#/components/schemas/Problem' }
+    NotFound:
+      description: Resource not found.
+      content:
+        application/problem+json:
+          schema: { $ref: '#/components/schemas/Problem' }
+    Conflict:
+      description: State conflict or idempotency conflict.
+      content:
+        application/problem+json:
+          schema: { $ref: '#/components/schemas/Problem' }
+    PreconditionFailed:
+      description: ETag/precondition no longer matches.
+      content:
+        application/problem+json:
+          schema: { $ref: '#/components/schemas/Problem' }
+    RateLimited:
+      description: Rate or concurrency limit exceeded.
+      headers:
+        Retry-After:
+          schema: { type: integer, minimum: 1 }
+      content:
+        application/problem+json:
+          schema: { $ref: '#/components/schemas/Problem' }
+    Unavailable:
+      description: Required audit, storage, clock or dependency unavailable.
+      content:
+        application/problem+json:
+          schema: { $ref: '#/components/schemas/Problem' }
+  schemas:
+    Problem:
+      type: object
+      required: [type, title, status, code, requestId]
+      properties:
+        type: { type: string, format: uri-reference }
+        title: { type: string, maxLength: 128 }
+        status: { type: integer, minimum: 400, maximum: 599 }
+        detail: { type: string, maxLength: 512 }
+        instance: { type: string, format: uri-reference }
+        code: { type: string, pattern: '^[a-z0-9_.-]{1,64}$' }
+        requestId: { type: string, format: uuid }
+        retryable: { type: boolean, default: false }
+      additionalProperties: false
+    HealthResponse:
+      type: object
+      required: [status]
+      properties:
+        status: { type: string, enum: [live, ready] }
+      additionalProperties: false
+    SealStatus:
+      type: object
+      required: [initialized, sealed, threshold]
+      properties:
+        initialized: { type: boolean }
+        sealed: { type: boolean }
+        threshold: { type: integer, const: 2 }
+      additionalProperties: false
+    BootstrapConsumeRequest:
+      type: object
+      required: [bootstrapToken]
+      properties:
+        bootstrapToken: { type: string, minLength: 48, maxLength: 64 }
+      additionalProperties: false
+    BootstrapConsumeResponse:
+      type: object
+      required: [bootstrapToken, expiresAt, capabilities]
+      properties:
+        bootstrapToken: { type: string, minLength: 48, maxLength: 64, writeOnly: true }
+        expiresAt: { type: string, format: date-time }
+        capabilities:
+          type: array
+          items: { type: string, enum: [create_first_password_identity, create_initial_acl_policy] }
+      additionalProperties: false
+    UnsealSession:
+      type: object
+      required: [sessionId, expiresAt, threshold]
+      properties:
+        sessionId: { type: string, format: uuid }
+        expiresAt: { type: string, format: date-time }
+        threshold: { type: integer, const: 2 }
+      additionalProperties: false
+    ShareSubmission:
+      type: object
+      required: [share]
+      properties:
+        share: { type: string, minLength: 1, maxLength: 4096, writeOnly: true, description: FRS1 share encoded as unpadded base64url. }
+      additionalProperties: false
+    ShareProgress:
+      type: object
+      required: [status, acceptedShares, threshold]
+      properties:
+        status: { type: string, enum: [accepted, completed] }
+        acceptedShares: { type: integer, minimum: 0, maximum: 2 }
+        threshold: { type: integer, const: 2 }
+      additionalProperties: false
+    PasswordLoginRequest:
+      type: object
+      required: [username, password]
+      properties:
+        username: { type: string, minLength: 3, maxLength: 64 }
+        password: { type: string, minLength: 1, maxLength: 1024, writeOnly: true }
+      additionalProperties: false
+    AppRoleLoginRequest:
+      type: object
+      required: [roleId, secretId]
+      properties:
+        roleId: { type: string, minLength: 22, maxLength: 22 }
+        secretId: { type: string, minLength: 43, maxLength: 64, writeOnly: true }
+      additionalProperties: false
+    TokenResponse:
+      type: object
+      required: [auth]
+      properties:
+        auth:
+          type: object
+          required: [clientToken, accessor, tokenType, expiresAt, renewable, principalId, policies]
+          properties:
+            clientToken: { type: string, writeOnly: true }
+            accessor: { type: string, minLength: 22, maxLength: 22 }
+            tokenType: { type: string, const: Bearer }
+            expiresAt: { type: string, format: date-time }
+            renewable: { type: boolean }
+            principalId: { type: string, format: uuid }
+            policies:
+              type: array
+              items: { type: string }
+          additionalProperties: false
+      additionalProperties: false
+    TokenMetadata:
+      type: object
+      required: [accessor, principalId, expiresAt, renewable, policies]
+      properties:
+        accessor: { type: string, minLength: 22, maxLength: 22 }
+        principalId: { type: string, format: uuid }
+        expiresAt: { type: string, format: date-time }
+        renewable: { type: boolean }
+        policies:
+          type: array
+          items: { type: string }
+      additionalProperties: false
+    CreateTokenRequest:
+      type: object
+      required: [policies]
+      properties:
+        policies:
+          type: array
+          minItems: 1
+          maxItems: 32
+          uniqueItems: true
+          items: { type: string, pattern: '^[a-z0-9][a-z0-9._-]{0,62}$' }
+        ttlSeconds: { type: integer, minimum: 1, maximum: 28800 }
+      additionalProperties: false
+    CreatePasswordUserRequest:
+      type: object
+      required: [username, password, policies]
+      properties:
+        username: { type: string, pattern: '^[a-z0-9][a-z0-9._-]{2,63}$' }
+        password: { type: string, minLength: 12, maxLength: 1024, writeOnly: true }
+        policies:
+          type: array
+          minItems: 1
+          maxItems: 32
+          uniqueItems: true
+          items: { type: string }
+      additionalProperties: false
+    UpdatePasswordUserRequest:
+      type: object
+      properties:
+        password: { type: string, minLength: 12, maxLength: 1024, writeOnly: true }
+        policies:
+          type: array
+          minItems: 1
+          maxItems: 32
+          uniqueItems: true
+          items: { type: string }
+      minProperties: 1
+      additionalProperties: false
+    PasswordUser:
+      type: object
+      required: [userId, username, policies, createdAt, updatedAt]
+      properties:
+        userId: { type: string, format: uuid }
+        username: { type: string }
+        policies:
+          type: array
+          items: { type: string }
+        createdAt: { type: string, format: date-time }
+        updatedAt: { type: string, format: date-time }
+      additionalProperties: false
+    AppRoleDefinition:
+      type: object
+      required: [name, policies]
+      properties:
+        name: { type: string, pattern: '^[a-z0-9][a-z0-9._-]{0,62}$' }
+        policies:
+          type: array
+          minItems: 1
+          maxItems: 32
+          uniqueItems: true
+          items: { type: string }
+        secretIdTtlSeconds: { type: integer, minimum: 1, maximum: 2592000, default: 86400 }
+        secretIdNumUses: { type: integer, minimum: 1, maximum: 10, default: 1 }
+        tokenTtlSeconds: { type: integer, minimum: 1, maximum: 3600, default: 900 }
+        cidrAllowlist:
+          type: array
+          maxItems: 64
+          uniqueItems: true
+          items: { type: string }
+      additionalProperties: false
+    AppRole:
+      allOf:
+        - $ref: '#/components/schemas/AppRoleDefinition'
+        - type: object
+          required: [roleId, createdAt, revision]
+          properties:
+            roleId: { type: string, minLength: 22, maxLength: 22 }
+            createdAt: { type: string, format: date-time }
+            revision: { type: integer, minimum: 1 }
+    AppRoleList:
+      type: object
+      required: [roles]
+      properties:
+        roles:
+          type: array
+          items: { $ref: '#/components/schemas/AppRole' }
+      additionalProperties: false
+    CreateSecretIdRequest:
+      type: object
+      properties:
+        ttlSeconds: { type: integer, minimum: 1, maximum: 2592000 }
+        numUses: { type: integer, minimum: 1, maximum: 10 }
+      additionalProperties: false
+    SecretIdResponse:
+      type: object
+      required: [secretId, expiresAt, uses]
+      properties:
+        secretId: { type: string, writeOnly: true }
+        expiresAt: { type: string, format: date-time }
+        uses: { type: integer, minimum: 1, maximum: 10 }
+      additionalProperties: false
+    AclRule:
+      type: object
+      required: [effect, resource, actions]
+      properties:
+        effect: { type: string, enum: [allow, deny] }
+        resource:
+          type: string
+          minLength: 1
+          maxLength: 512
+          description: Canonical resource pattern; only literal segments, '*' and terminal '**' are permitted.
+        actions:
+          type: array
+          minItems: 1
+          uniqueItems: true
+          items: { type: string, enum: [read, create, update, delete, list, execute, manage] }
+      additionalProperties: false
+    AclPolicyInput:
+      type: object
+      required: [version, rules]
+      properties:
+        version: { type: integer, const: 1 }
+        rules:
+          type: array
+          minItems: 1
+          maxItems: 256
+          items: { $ref: '#/components/schemas/AclRule' }
+      additionalProperties: false
+    AclPolicy:
+      allOf:
+        - $ref: '#/components/schemas/AclPolicyInput'
+        - type: object
+          required: [name, revision, updatedAt]
+          properties:
+            name: { type: string }
+            revision: { type: integer, minimum: 1 }
+            updatedAt: { type: string, format: date-time }
+    PolicyList:
+      type: object
+      required: [policies]
+      properties:
+        policies:
+          type: array
+          items:
+            type: object
+            required: [name, revision]
+            properties:
+              name: { type: string }
+              revision: { type: integer, minimum: 1 }
+      additionalProperties: false
+    BeginRootOperationRequest:
+      type: object
+      required: [operation]
+      properties:
+        operation: { type: string, enum: [generate, rotate, revoke] }
+        targetId: { type: string, maxLength: 128 }
+      additionalProperties: false
+    RootOperation:
+      type: object
+      required: [operationId, operation, status, expiresAt, acceptedApprovals, threshold]
+      properties:
+        operationId: { type: string, format: uuid }
+        operation: { type: string, enum: [generate, rotate, revoke] }
+        status: { type: string, enum: [pending, completed, failed, expired, cancelled, indeterminate] }
+        expiresAt: { type: string, format: date-time }
+        acceptedApprovals: { type: integer, minimum: 0, maximum: 2 }
+        threshold: { type: integer, const: 2 }
+      additionalProperties: false
+    AuditStatus:
+      type: object
+      required: [healthy, authoritativeFileAvailable, pendingEvents, oldestPendingSeconds, lastSequence]
+      properties:
+        healthy: { type: boolean }
+        authoritativeFileAvailable: { type: boolean }
+        pendingEvents: { type: integer, minimum: 0 }
+        oldestPendingSeconds: { type: integer, minimum: 0 }
+        lastSequence: { type: string, pattern: '^[0-9]+$' }
+      additionalProperties: false
