@@ -37,16 +37,16 @@ This cross-reference is not a substitute for the full approved endpoint catalog.
 
 | Area | Operation family to map to the existing approved API catalog | Existing dependency / boundary | Phase 2.0 status |
 |---|---|---|---|
-| Service diagnostics | Process liveness, readiness and non-secret service diagnostics | Server lifecycle and dependency health are not yet implemented | Copy approved inclusion and permitted fields from the source catalog |
+| Service diagnostics | Process liveness, readiness and non-secret service diagnostics | Server lifecycle and dependency health are Phase 2 service composition | Carry over approved routes and permitted fields from the source catalog |
 | Seal state | Read current seal/bootstrap state | ferrum-seal library; response may reveal operational state | Copy approved route and sealed classification from the source catalog |
 | Bootstrap | Initialize/bootstrap the root ceremony and persist its state | Existing Phase 1 seal/recovery contracts; durable service composition required | Copy approved operation and caller authority; preserve one-time semantics |
 | Unseal | Submit the mandatory Shamir 2-of-3 unseal material | Unsealer port; shares are sensitive and must never enter logs, audit bodies or artifacts | Copy approved request contract and throttling policy; preserve Shamir 2-of-3 |
 | Seal | Request a transition to Sealed | SealController boundary; mutation requires authorization and audit under approved rules | Copy approved operation and authority rules |
 | Root lifecycle | Generate/rotate/revoke root operations | Existing 2-of-3 RootQuorumPolicy; sensitive root material handling must be specified | Copy approved root-operation surface and preserve independent 2-of-3 quorum |
-| Authentication | Issue/inspect/renew/revoke credentials, if selected | Credential format, issuer and lifecycle are undecided | Copy approved authentication mechanism and operation subset |
-| Identity administration | Create/disable/inspect identities, if selected | Trusted server-side principal model is undecided | Inclusion and authority pending |
-| Policy administration | Create/read/update/delete/list ACL policies, if selected | Policy grammar, storage and administrative recovery are undecided | Copy approved identity operation set and authority |
-| Audit administration | Verify audit-chain integrity and inspect non-secret sink status, if selected | Audit schema, verification and operational permissions are undecided | Copy approved exposure channel and permissions |
+| Authentication | The approved authentication and credential lifecycle operations | Credential format, issuer and lifecycle as already approved in the source design | Copy approved authentication mechanism and operation subset |
+| Identity administration | The approved identity-administration operations | Server-side principal context from the approved identity model | Copy approved identity operations and authority rules from the source catalog |
+| Policy administration | The approved ACL/policy-administration operations | The owner-approved ACL grammar, storage and administrative recovery model | Copy approved policy operation set and authority from the source catalog |
+| Audit administration | The approved audit verification and operational diagnostics | Audit schema, verification and operational permissions as already approved in the source design | Copy approved exposure channel and permissions |
 
 ### Explicit Phase 2 exclusions
 
@@ -65,9 +65,9 @@ Apply the already approved route classifications to every selected operation. Th
 
 | Operation category | Available while sealed? | Authentication | Authorization | Required audit intent/outcome | Additional invariant |
 |---|---|---|---|---|---|
-| Liveness/readiness | Copy approved health/readiness exposure and fields | Pending | Pending | Pending | Must not disclose secrets, credentials, shares or protected values |
+| Liveness/readiness | Copy approved health/readiness exposure and fields | Copy approved authentication rule | Copy approved authorization rule | Copy approved audit rule | Must not disclose secrets, credentials, shares or protected values |
 | Seal-state diagnostics | Copy approved sealed-state rule | Copy approved auth rule | Copy approved ACL rule | Copy approved audit rule | Preserve approved limits on state disclosure |
-| Bootstrap | Copy approved bootstrap sealed-mode rule | Copy approved bootstrap authority | Pending | Sensitive lifecycle audit per approved contract | One-time/replay protection; never persist or log shares/tokens in plaintext |
+| Bootstrap | Copy approved bootstrap sealed-mode rule | Copy approved bootstrap authority | Copy approved authorization rule | Sensitive lifecycle audit per approved contract | One-time/replay protection; never persist or log shares/tokens in plaintext |
 | Unseal | Copy approved sealed-mode exposure | Mandatory Shamir 2-of-3; copy approved request/auth envelope | Copy approved authorization rule | Copy approved intent/outcome rule | Reject wrong, duplicate, mixed-ceremony or insufficient shares; no provider fallback |
 | Seal | Copy approved sealed-state rule | Copy approved authentication rule | Copy approved authorization rule | Required for sensitive mutation per approved policy | Failure must not leave a partially transitioned state |
 | Root lifecycle | Copy approved sealed-state rule | Separate 2-of-3 root-operation quorum remains mandatory | Copy approved authorization rule | Required for sensitive mutation | API auth must not replace or weaken the independent quorum |
@@ -207,13 +207,13 @@ This table tracks the provenance of decisions the owner says were already approv
 
 ## 10. Phase 2.0 completion checklist
 
-- [ ] Owner approves the final native operation catalog and explicit exclusions.
-- [ ] Every decision D2.0-01 through D2.0-11 is owner-approved or explicitly deferred with dependent feature disabled.
-- [ ] Any change to an existing approved requirement has a new/superseding ADR; existing requirements are not silently weakened.
-- [ ] Every selected operation has a completed seal/authentication/authorization/audit classification.
-- [ ] Logical interface contracts and request-pipeline invariants map to concrete tests and responsible subphases.
-- [ ] Threat-model changes, residual risks and operational dependencies are recorded.
-- [ ] Roadmap and ADR index link to the approved records.
+- [ ] The full owner-approved Phase 2 operation catalog, route names, methods, schemas and explicit exclusions are reproduced in Community documentation.
+- [ ] Every original owner-approved Phase 2 decision has provenance and a corresponding Community ADR/contract reference; no decision is reopened or replaced.
+- [ ] Each operation has its previously approved sealed-mode, authentication, authorization, rate-limit and audit classification mapped to the responsible subphase.
+- [ ] HTTP/JSON and gRPC reference the previously approved wire/schema, IDL and error mapping.
+- [ ] The approved identity/credential lifecycle, ACL grammar, limits, TLS certificate lifecycle, audit schema/durability and outbox recovery rules are transcribed without changes.
+- [ ] Threat-model changes, residual risks and tests are mapped to the responsible implementation subphases.
+- [ ] ROADMAP, ADR index, architecture overview and security docs are consistent.
 - [ ] Phase 0 owner closeout gate is recorded before Phase 2.1 runtime implementation begins.
 
 **Current result:** the existing Phase 2 architecture is to be consolidated, not re-decided. The owner has clarified that D2.0-02 through D2.0-11 were already approved; their entries track source/carryover references rather than asking for new selections. Remaining work is to copy those approved specifics into the public Community records and map operations to tests. No Phase 2 runtime implementation is authorized before the Phase 0 entry gate and completion of this documentation reconciliation.
