@@ -25,6 +25,7 @@ The owner explicitly delegated the choice of detailed, previously unspecified Co
 - Schema compatibility is checked in CI. Breaking changes require a new API version or an explicitly approved migration.
 - The machine-readable contracts are design artifacts; they do not claim the server runtime exists.
 - The API includes the complete AppRole Secret ID lifecycle (create once, revoke by accessor) and secret-safe replay receipt semantics.
+- Bootstrap is a two-stage restricted flow: one-time local `fvbt_` consumption issues a 15-minute `fvst_` capability, accepted only by a single atomic completion endpoint that creates the first identity and a server-defined Phase 2 `bootstrap-admin` policy.
 
 ## Verification
 
