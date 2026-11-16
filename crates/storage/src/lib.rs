@@ -990,12 +990,8 @@ impl RotationStore for RedbStore {
             .begin_write()
             .map_err(|_| RotationStoreError::Unavailable)?;
         if persist_dependency {
-            ensure_key_version_not_retired(
-                &tx,
-                event.key_id(),
-                event.target_key_version(),
-            )
-            .map_err(|_| RotationStoreError::CorruptState)?;
+            ensure_key_version_not_retired(&tx, event.key_id(), event.target_key_version())
+                .map_err(|_| RotationStoreError::CorruptState)?;
         }
         let mut dependencies = tx
             .open_table(DEPENDENCIES)
