@@ -2,7 +2,7 @@
 
 ## Project status
 
-Ferrum Vault Community has completed and owner-accepted the Phase 1 library foundation; it is not a production secrets manager. The repository contains cryptographic/key-management and barrier contracts, offline Shamir recovery, seal/bootstrap and Unsealer components, an optional disabled-by-default AWS KMS adapter, and a durable redb storage adapter. The seal controller and storage adapter remain separate library components: the full service lifecycle, native server/API, authentication, ACL enforcement and durable audit pipeline have not yet been composed. There is no CLI.
+Ferrum Vault Community has completed and owner-accepted the Phase 1 library foundation; it is not a production secrets manager. The repository contains cryptographic/key-management and barrier contracts, offline Shamir recovery, seal/bootstrap and Unsealer components, an optional disabled-by-default AWS KMS adapter, and a durable redb storage adapter. The seal controller and storage adapter remain separate library components: the full service lifecycle, native server/API, authentication, ACL enforcement and durable audit pipeline have not yet been composed. No CLI binary is currently delivered; the approved CLI archive distribution is planned in Phase 2 under [ADR-0023](docs/adr/0023-cli-distribution.md).
 
 Do not use this project to store or process production secrets. The project has not been independently audited and has no FIPS validation. Passing CI is not an external security audit or a production-readiness claim.
 
