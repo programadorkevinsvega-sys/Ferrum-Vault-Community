@@ -968,10 +968,47 @@ impl RotationStore for RedbStore {
         {
             return Err(RotationStoreError::CorruptState);
         }
+        let dependency = external_dependency_key(
+            event.key_id().as_str(),
+            event.target_key_version(),
+            DependencyKind::RotationJob,
+            job_id.as_bytes(),
+        )
+        .map_err(|_| RotationStoreError::CorruptState)?;
+        let persist_dependency = match event.kind() {
+            RotationAuditKind::Started | RotationAuditKind::Checkpointed if !checkpoint.is_complete() => {
+                true
+            }
+            RotationAuditKind::Completed if checkpoint.is_complete() => false,
+            _ => return Err(RotationStoreError::CorruptState),
+        };
+
         let encoded = encode_checkpoint(&checkpoint);
         let tx = self
             .begin_write()
             .map_err(|_| RotationStoreError::Unavailable)?;
+        if persist_dependency {
+            ensure_key_version_not_retired(
+                &tx,
+                event.key_id().as_str(),
+                event.target_key_version(),
+            )
+            .map_err(|_| RotationStoreError::CorruptState)?;
+        }
+        let mut dependencies = tx
+            .open_table(DEPENDENCIES)
+            .map_err(|_| RotationStoreError::Unavailable)?;
+        if persist_dependency {
+            dependencies
+                .insert(dependency.as_slice(), &[1_u8][..])
+                .map_err(|_| RotationStoreError::Unavailable)?;
+        } else {
+            dependencies
+                .remove(dependency.as_slice())
+                .map_err(|_| RotationStoreError::Unavailable)?;
+        }
+        drop(dependencies);
+
         let mut table = tx
             .open_table(CHECKPOINTS)
             .map_err(|_| RotationStoreError::Unavailable)?;
