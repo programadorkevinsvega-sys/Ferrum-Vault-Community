@@ -27,7 +27,7 @@ A database with existing barrier records but no completeness marker fails closed
 
 ## Backup and recovery
 
-Tests cover committed-state reopen, monotonic nonce reservations after reopen, concurrent non-overlapping reservations, rollback of an uncommitted transaction, checkpoint persistence, atomic CAS/audit and cursor properties. They do not simulate destructive power loss on every filesystem/device combination.
+Tests cover committed-state reopen, monotonic nonce reservations after reopen, non-overlapping reservations from eight separate OS processes opening the same database, independent database-handle concurrency, rollback of an uncommitted transaction, checkpoint persistence, atomic CAS/audit, tombstone-based monotonic key versions and cursor properties. They do not simulate destructive power loss on every filesystem/device combination.
 
 Backups must use a coordinated consistent snapshot/backup procedure. Preserve the database and required key-wrapping material together, encrypt backup media, restrict access, and register retained backup/snapshot references. A raw file copy while a writer is active is unsupported. Restore procedures and device durability assumptions require deployment-specific validation.
 
