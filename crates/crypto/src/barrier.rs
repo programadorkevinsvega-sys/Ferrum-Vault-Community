@@ -963,7 +963,7 @@ pub struct RotationAuditEvent {
 }
 
 impl RotationAuditEvent {
-    fn new(
+    pub fn new(
         job_id: &str,
         key_id: &KeyId,
         target_key_version: u64,
