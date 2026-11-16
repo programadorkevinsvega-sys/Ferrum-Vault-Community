@@ -17,6 +17,7 @@ service SystemService {
   rpc GetReadiness(google.protobuf.Empty) returns (HealthResponse);
   rpc GetSealStatus(google.protobuf.Empty) returns (SealStatus);
   rpc ConsumeBootstrapToken(BootstrapConsumeRequest) returns (BootstrapConsumeResponse);
+  rpc CompleteBootstrap(BootstrapCompletionRequest) returns (BootstrapCompletionResponse); // Authorization: Bearer fvst_ setup token.
   rpc CreateUnsealSession(google.protobuf.Empty) returns (UnsealSession);
   rpc SubmitUnsealShare(ShareSubmission) returns (ShareProgress); // session_id binds the share to the active ceremony.
   rpc Seal(google.protobuf.Empty) returns (google.protobuf.Empty);
@@ -89,9 +90,24 @@ message BootstrapConsumeRequest {
 }
 
 message BootstrapConsumeResponse {
-  bytes bootstrap_token = 1; // Raw 32-byte setup token; HTTP encoding adds fvbt_. Single-use, 5-minute.
+  bytes setup_token = 1; // Raw 32-byte fvst_ setup token; single-use, 15-minute.
   google.protobuf.Timestamp expires_at = 2;
-  repeated string capabilities = 3;
+  repeated string capabilities = 3; // Only "complete_bootstrap".
+}
+
+message BootstrapCompletionRequest {
+  string username = 1;
+  string password = 2;
+  string policy_name = 3; // Must be "bootstrap-admin".
+  AclPolicyInput initial_policy = 4; // Exactly one v1 policy, assigned to the first identity.
+}
+
+message BootstrapCompletionResponse {
+  bool initialized = 1; // Always true on success.
+  string user_id = 2;
+  string username = 3;
+  string policy_name = 4;
+  uint64 policy_revision = 5; // Always 1.
 }
 
 message UnsealSession {
