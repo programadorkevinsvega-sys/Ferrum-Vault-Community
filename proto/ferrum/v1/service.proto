@@ -1,0 +1,356 @@
+syntax = "proto3";
+
+package ferrum.v1;
+
+option java_multiple_files = true;
+option go_package = "github.com/ferrum-vault/community/gen/ferrum/v1;ferrumv1";
+
+import "google/protobuf/empty.proto";
+import "google/protobuf/timestamp.proto";
+
+// All methods map to the canonical operation IDs and security semantics in
+// docs/phase-2/service-contract.md. Request ID, bearer token and idempotency
+// key are carried in transport metadata, not caller-controlled message fields.
+
+service SystemService {
+  rpc GetLiveness(google.protobuf.Empty) returns (HealthResponse);
+  rpc GetReadiness(google.protobuf.Empty) returns (HealthResponse);
+  rpc GetSealStatus(google.protobuf.Empty) returns (SealStatus);
+  rpc ConsumeBootstrapToken(BootstrapConsumeRequest) returns (BootstrapConsumeResponse);
+  rpc CompleteBootstrap(BootstrapCompletionRequest) returns (BootstrapCompletionResponse); // Authorization: Bearer fvst_ setup token.
+  rpc CreateUnsealSession(google.protobuf.Empty) returns (UnsealSession);
+  rpc SubmitUnsealShare(ShareSubmission) returns (ShareProgress); // session_id binds the share to the active ceremony.
+  rpc Seal(google.protobuf.Empty) returns (google.protobuf.Empty);
+}
+
+service AuthService {
+  rpc PasswordLogin(PasswordLoginRequest) returns (TokenResponse);
+  rpc AppRoleLogin(AppRoleLoginRequest) returns (TokenResponse);
+}
+
+service TokenService {
+  rpc LookupSelf(google.protobuf.Empty) returns (TokenMetadata);
+  rpc RenewSelf(google.protobuf.Empty) returns (TokenResponse);
+  rpc RevokeSelf(google.protobuf.Empty) returns (google.protobuf.Empty);
+  rpc CreateToken(CreateTokenRequest) returns (TokenResponse);
+  rpc RevokeToken(RevokeTokenRequest) returns (google.protobuf.Empty);
+}
+
+service IdentityService {
+  rpc CreatePasswordUser(CreatePasswordUserRequest) returns (PasswordUser);
+  rpc GetPasswordUser(GetPasswordUserRequest) returns (PasswordUser);
+  rpc UpdatePasswordUser(UpdatePasswordUserRequest) returns (PasswordUser);
+  rpc DeletePasswordUser(DeletePasswordUserRequest) returns (google.protobuf.Empty);
+}
+
+service AppRoleService {
+  rpc CreateRole(AppRoleDefinition) returns (AppRole);
+  rpc ListRoles(ListRequest) returns (AppRoleList);
+  rpc GetRole(GetRoleRequest) returns (AppRole);
+  rpc UpdateRole(UpdateRoleRequest) returns (AppRole);
+  rpc DeleteRole(DeleteRoleRequest) returns (google.protobuf.Empty);
+  rpc CreateSecretId(CreateSecretIdRequest) returns (SecretIdResponse);
+  rpc RevokeSecretId(RevokeSecretIdRequest) returns (google.protobuf.Empty);
+}
+
+service PolicyService {
+  rpc ListPolicies(ListRequest) returns (PolicyList);
+  rpc GetPolicy(GetPolicyRequest) returns (AclPolicy);
+  rpc PutPolicy(PutPolicyRequest) returns (AclPolicy);
+  rpc DeletePolicy(DeletePolicyRequest) returns (google.protobuf.Empty);
+}
+
+service RootService {
+  rpc BeginOperation(BeginRootOperationRequest) returns (RootOperation);
+  rpc GetOperation(GetRootOperationRequest) returns (RootOperation);
+  rpc ApproveOperation(ApproveRootOperationRequest) returns (RootOperation);
+}
+
+service AuditService {
+  rpc GetStatus(google.protobuf.Empty) returns (AuditStatus);
+}
+
+message HealthResponse {
+  enum Status {
+    STATUS_UNSPECIFIED = 0;
+    LIVE = 1;
+    READY = 2;
+  }
+  Status status = 1;
+}
+
+message SealStatus {
+  bool initialized = 1;
+  bool sealed = 2;
+  uint32 threshold = 3; // Always 2 for the approved Community unseal adapter.
+}
+
+message BootstrapConsumeRequest {
+  bytes bootstrap_token = 1; // Raw 32-byte secret; HTTP encoding adds the fvbt_ prefix.
+}
+
+message BootstrapConsumeResponse {
+  bytes setup_token = 1; // Raw 32-byte fvst_ setup token; single-use, 15-minute.
+  google.protobuf.Timestamp expires_at = 2;
+  repeated string capabilities = 3; // Only "complete_bootstrap".
+}
+
+message BootstrapCompletionRequest {
+  string username = 1;
+  string password = 2;
+  // The server creates and assigns the fixed version-1 bootstrap-admin policy.
+}
+
+message BootstrapCompletionResponse {
+  bool initialized = 1; // Always true on success.
+  string user_id = 2;
+  string username = 3;
+  string policy_name = 4;
+  uint64 policy_revision = 5; // Always 1.
+}
+
+message UnsealSession {
+  string session_id = 1;
+  google.protobuf.Timestamp expires_at = 2;
+  uint32 threshold = 3;
+}
+
+message ShareSubmission {
+  bytes share = 1; // Canonical binary FRS1 envelope; never logged or persisted.
+  string session_id = 2; // Required for SystemService.SubmitUnsealShare.
+}
+
+message ShareProgress {
+  enum Status {
+    STATUS_UNSPECIFIED = 0;
+    IN_PROGRESS = 1;
+    COMPLETED = 2;
+  }
+  Status status = 1; // Never reports submitted-share count or participant identity.
+  uint32 threshold = 2; // Fixed 2-of-3 threshold.
+}
+
+message PasswordLoginRequest {
+  string username = 1;
+  string password = 2;
+}
+
+message AppRoleLoginRequest {
+  string role_id = 1; // 128-bit public ID encoded as unpadded base64url.
+  string secret_id = 2; // fvsa_ prefix plus 32 random bytes encoded as unpadded base64url.
+}
+
+message TokenAuth {
+  string client_token = 1; // fvct_ prefix plus 32 random bytes encoded as unpadded base64url; never persisted in plaintext.
+  string accessor = 2;
+  string token_type = 3;
+  google.protobuf.Timestamp expires_at = 4;
+  bool renewable = 5;
+  string principal_id = 6;
+  repeated string policies = 7;
+}
+
+message TokenResponse {
+  TokenAuth auth = 1; // When replayed=true, auth.client_token is empty and accessor identifies the issued token.
+  bool replayed = 2;
+}
+
+message TokenMetadata {
+  string accessor = 1;
+  string principal_id = 2;
+  google.protobuf.Timestamp expires_at = 3;
+  bool renewable = 4;
+  repeated string policies = 5;
+}
+
+message CreateTokenRequest {
+  repeated string policies = 1;
+  uint64 ttl_seconds = 2;
+}
+
+message RevokeTokenRequest {
+  string accessor = 1;
+}
+
+message CreatePasswordUserRequest {
+  string username = 1;
+  string password = 2;
+  repeated string policies = 3;
+}
+
+message GetPasswordUserRequest {
+  string user_id = 1;
+}
+
+message UpdatePasswordUserRequest {
+  string user_id = 1;
+  optional string password = 2;
+  repeated string policies = 3;
+  uint64 expected_revision = 4;
+}
+
+message DeletePasswordUserRequest {
+  string user_id = 1;
+  uint64 expected_revision = 2;
+}
+
+message PasswordUser {
+  string user_id = 1;
+  string username = 2;
+  repeated string policies = 3;
+  google.protobuf.Timestamp created_at = 4;
+  google.protobuf.Timestamp updated_at = 5;
+  uint64 revision = 6;
+}
+
+message AppRoleDefinition {
+  string name = 1;
+  repeated string policies = 2;
+  uint64 secret_id_ttl_seconds = 3;
+  uint32 secret_id_num_uses = 4;
+  uint64 token_ttl_seconds = 5;
+  repeated string cidr_allowlist = 6;
+}
+
+message AppRole {
+  AppRoleDefinition definition = 1;
+  string role_id = 2;
+  google.protobuf.Timestamp created_at = 3;
+  uint64 revision = 4;
+}
+
+message ListRequest {
+  uint32 page_size = 1;
+  string page_token = 2;
+}
+
+message AppRoleList {
+  repeated AppRole roles = 1;
+  string next_page_token = 2;
+}
+
+message GetRoleRequest {
+  string name = 1;
+}
+
+message UpdateRoleRequest {
+  AppRoleDefinition definition = 1;
+  uint64 expected_revision = 2;
+}
+
+message DeleteRoleRequest {
+  string name = 1;
+  uint64 expected_revision = 2;
+}
+
+message CreateSecretIdRequest {
+  string role_name = 1;
+  uint64 ttl_seconds = 2;
+  uint32 num_uses = 3;
+}
+
+message SecretIdResponse {
+  string secret_id = 1; // fvsa_ prefix plus 32 random bytes encoded as unpadded base64url; returned once.
+  string accessor = 2; // Non-secret 128-bit handle.
+  google.protobuf.Timestamp expires_at = 3;
+  uint32 uses = 4;
+  bool replayed = 5; // If true, secret_id is empty and the accessor identifies the prior issuance.
+}
+
+message RevokeSecretIdRequest {
+  string role_name = 1;
+  string accessor = 2;
+}
+
+message AclRule {
+  enum Effect {
+    EFFECT_UNSPECIFIED = 0;
+    ALLOW = 1;
+    DENY = 2;
+  }
+  Effect effect = 1;
+  string resource = 2;
+  repeated string actions = 3;
+}
+
+message AclPolicyInput {
+  uint32 version = 1; // Only version 1 is supported.
+  repeated AclRule rules = 2;
+}
+
+message AclPolicy {
+  string name = 1;
+  AclPolicyInput policy = 2;
+  uint64 revision = 3;
+  google.protobuf.Timestamp updated_at = 4;
+}
+
+message GetPolicyRequest {
+  string name = 1;
+}
+
+message PutPolicyRequest {
+  string name = 1;
+  AclPolicyInput policy = 2;
+  uint64 expected_revision = 3;
+}
+
+message DeletePolicyRequest {
+  string name = 1;
+  uint64 expected_revision = 2;
+}
+
+message PolicySummary {
+  string name = 1;
+  uint64 revision = 2;
+}
+
+message PolicyList {
+  repeated PolicySummary policies = 1;
+  string next_page_token = 2;
+}
+
+message BeginRootOperationRequest {
+  enum Operation {
+    OPERATION_UNSPECIFIED = 0;
+    GENERATE = 1;
+    ROTATE = 2;
+    REVOKE = 3;
+  }
+  Operation operation = 1;
+  string target_id = 2;
+}
+
+message GetRootOperationRequest {
+  string operation_id = 1;
+}
+
+message ApproveRootOperationRequest {
+  string operation_id = 1;
+  bytes share = 2; // One FRS1 share from a distinct participant and distinct authenticated principal; never logged/persisted.
+}
+
+message RootOperation {
+  enum Status {
+    STATUS_UNSPECIFIED = 0;
+    PENDING = 1;
+    COMPLETED = 2;
+    FAILED = 3;
+    EXPIRED = 4;
+    CANCELLED = 5;
+    INDETERMINATE = 6;
+  }
+  string operation_id = 1;
+  BeginRootOperationRequest.Operation operation = 2;
+  Status status = 3;
+  google.protobuf.Timestamp expires_at = 4;
+  uint32 threshold = 5; // Fixed 2-of-3; no approvals count is disclosed.
+}
+
+message AuditStatus {
+  bool healthy = 1;
+  bool authoritative_file_available = 2;
+  uint64 pending_events = 3;
+  uint64 oldest_pending_seconds = 4;
+  string last_sequence = 5; // Decimal string avoids JSON 53-bit precision loss.
+}

@@ -1,0 +1,103 @@
+# Copy to /etc/ferrum/ferrum.toml and replace paths/addresses for the deployment.
+# This file contains references only; never put credential or private-key values here.
+
+[server]
+listen = "127.0.0.1:8443"
+max_connections = 512
+max_in_flight_requests = 256
+trusted_proxy_cidrs = []
+
+[server.tls]
+cert_file = "/etc/ferrum/tls/server.crt"
+key_file = "/etc/ferrum/tls/server.key"
+# TLS 1.3 is fixed; there is intentionally no minimum-version override.
+# 0-RTT is always disabled.
+
+[server.tls.client_auth]
+enabled = false
+# Required when enabled:
+# ca_bundle_file = "/etc/ferrum/mtls/client-ca.pem"
+# san_mapping_file = "/etc/ferrum/mtls/san-principal-map.toml"
+# crl_file = "/etc/ferrum/mtls/client-crl.pem"
+
+[limits]
+max_http_body_bytes = 1048576
+max_grpc_message_bytes = 1048576
+max_header_bytes = 16384
+max_request_target_bytes = 8192
+max_json_depth = 32
+max_json_string_bytes = 262144
+default_page_size = 50
+max_page_size = 100
+
+[timeouts]
+header_read_ms = 5000
+body_read_ms = 10000
+request_ms = 15000
+max_request_ms = 30000
+keep_alive_idle_ms = 60000
+graceful_shutdown_ms = 30000
+
+[rate_limit]
+preauth_per_ip_per_minute = 60
+preauth_burst = 20
+login_per_ip_per_minute = 10
+login_per_identifier_per_minute = 5
+unseal_attempts_per_ip_per_15m = 5
+authenticated_per_identity_per_minute = 600
+authenticated_burst = 120
+admin_mutations_per_identity_per_minute = 60
+admin_mutation_burst = 10
+
+[auth]
+default_token_ttl_seconds = 900
+max_token_ttl_seconds = 28800
+privileged_token_ttl_seconds = 300
+privileged_token_max_ttl_seconds = 900
+privileged_tokens_renewable = false
+argon2id_memory_kib = 65536
+argon2id_iterations = 3
+argon2id_parallelism = 4
+argon2id_concurrent = 4
+argon2id_queue = 8
+approle_secret_id_ttl_seconds = 86400
+approle_secret_id_max_ttl_seconds = 2592000
+approle_secret_id_uses_default = 1
+approle_secret_id_uses_max = 10
+approle_token_ttl_seconds = 900
+approle_token_max_ttl_seconds = 3600
+bootstrap_token_ttl_seconds = 300
+bootstrap_setup_token_ttl_seconds = 900
+
+[ceremony]
+unseal_session_ttl_seconds = 300
+unseal_active_sessions = 1
+root_operation_session_ttl_seconds = 300
+root_operation_max_active = 1
+
+[ceremony.root_quorum]
+# Required explicitly; this does not change the separate offline recovery threshold.
+threshold = 2
+total_shares = 3
+
+[storage]
+# Must be absolute, owned by the service account, mode 0700 and not a symlink.
+data_dir = "/var/lib/ferrum/data"
+
+[audit]
+file_path = "/var/lib/ferrum/audit/audit.jsonl"
+retention_days = 90
+stdout_enabled = true
+syslog_tls_enabled = false
+# Required only when syslog_tls_enabled = true:
+# syslog_tls_endpoint = "logs.example.invalid:6514"
+# syslog_ca_file = "/etc/ferrum/audit/syslog-ca.pem"
+# syslog_client_cert_file = "/etc/ferrum/audit/syslog-client.crt"
+# syslog_client_key_file = "/etc/ferrum/audit/syslog-client.key"
+
+[outbox]
+max_pending_events = 10000
+max_oldest_pending_seconds = 60
+
+[clock]
+backward_jump_unsafe_seconds = 30
