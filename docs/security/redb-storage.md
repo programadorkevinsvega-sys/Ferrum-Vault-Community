@@ -4,7 +4,7 @@
 
 The initial Community persistence backend is redb 4.6.0, selected by ADR-0003. redb is an embedded storage engine, not a cryptographic provider. `ferrum-storage` stores opaque values; protected plaintext must be encrypted by the barrier before persistence. FBE1 records are kept in a dedicated table with a durable dependency index used during key retirement.
 
-The database may contain ciphertext, FBE1 envelope metadata, nonce reservation metadata, rotation checkpoints, audit metadata and key-dependency indexes. It must not contain plaintext DEKs, seal-root material, Shamir shares, bootstrap tokens or unencrypted protected values.
+The database may contain ciphertext, FBE1 envelope metadata, nonce reservation metadata, rotation checkpoints, audit metadata and key-dependency indexes. It must not contain plaintext DEKs, seal-root material, Shamir shares, bootstrap tokens or unencrypted protected values. FBE1 paths enforce the 4,096-byte storage-key limit.
 
 ## Durability and concurrency
 
