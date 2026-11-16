@@ -1207,7 +1207,7 @@ mod tests {
     use ferrum_crypto::barrier::{RotationAuditEvent, RotationAuditKind};
     use proptest::prelude::*;
     use std::num::NonZeroU64;
-    use std::process::Command;
+    use std::process::{Command, Stdio};
     use std::sync::atomic::{AtomicU64, Ordering};
     use std::thread;
 
@@ -1319,6 +1319,8 @@ mod tests {
                     .arg("--ignored")
                     .arg("--nocapture")
                     .env("FERRUM_REDB_CHILD_DATABASE", &file)
+                    .stdout(Stdio::piped())
+                    .stderr(Stdio::piped())
                     .spawn()
                     .unwrap()
             })
