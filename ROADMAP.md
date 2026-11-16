@@ -269,22 +269,22 @@ The following are required contract boundaries. These descriptions identify resp
 | Audit sink | Durable intent/outcome append and verification contract, sink failure semantics, cancellation behavior, and no secret disclosure |
 | Configuration | Validated startup configuration; unsafe or incomplete required security configuration fails closed; defaults exist only where approved |
 
-### 2.5 Decisions that still require explicit owner approval
+### 2.5 Reconciliation of already approved Phase 2 decisions
 
-The owner has confirmed that these Phase 2 choices were already decided in the approved architecture. The Community ADRs are concise adaptations, so this section is a carryover/provenance checklist rather than an open decision list. Do not ask the owner to choose them again or replace them with new proposals:
+**Important:** the Community ADRs are concise adaptations of the owner-approved source architecture, as documented in [SOURCE-MAP.md](docs/adr/SOURCE-MAP.md). Their shorter wording is not a new decision and is not evidence that a corresponding detail was undecided. The owner has confirmed that the Phase 2 choices listed below were already made. The implementation team must carry them into the Community contracts and must not ask the owner to select them again, silently substitute alternatives or invent values.
 
-1. **Transport and server implementation:** whether Community exposes HTTP, gRPC or both in this phase; the concrete server framework; protocol mapping and any schema-generation technology.
-2. **Native API catalog:** exact resources, routes, methods and operations included in the Phase 2 MVP; request/response representation, pagination and error envelope details.
-3. **Authentication model:** supported authentication method(s), principal/identity fields, credential representation and storage, issuance/bootstrap authority, token/session lifetime, renewal, revocation, rotation and replay behavior. Do not assume AppRole or Vault token compatibility; ADR-0018 is a later optional compatibility surface.
-4. **Authorization model:** ACL policy syntax and storage, resource/path grammar, capability vocabulary, matching and precedence rules, policy update/version semantics, administrative bootstrap and recovery from policy lockout.
-5. **Rate limiting and request bounds:** algorithms, windows, burst/quotas, per-source identity rules, persistence/distribution scope, trusted-proxy configuration, maximum request size, timeouts and failure behavior. ADR-0005 requires these controls but supplies no numeric limits.
-6. **Sealed-mode allowlist:** exact endpoints and response fields permitted while sealed, with rationale that they are non-sensitive.
-7. **TLS certificate operations:** certificate/key provisioning, trust roots, rotation and reload behavior. TLS 1.3 with rustls is approved; the lifecycle and deployment mechanism are not specified here.
-8. **Audit details:** event schema and canonical encoding, hash algorithm and chain metadata, append durability boundary, sink selection/configuration, rotation/archival/export, retention enforcement and verification procedure. ADR-0005 approves JSON-file hash-chain plus stdout/syslog and a configurable 90-day default but does not define all these mechanics.
-9. **Audit/state coordination:** transaction boundary and the outbox/idempotency/reconciliation mechanism to use when audit and protected state cannot commit atomically.
-10. **Service configuration and operations:** configuration source/format, secret handling for server credentials, health/readiness semantics, graceful shutdown and supported deployment assumptions.
+1. **Transport and server:** carry forward the approved HTTP/JSON + gRPC model through a shared security pipeline, TLS 1.3/rustls and the established request ordering (ADR-0005 and ADR-0025). Carry over the approved server/framework, listener and protocol mapping choices.
+2. **Native API catalog and wire contracts:** reproduce the already approved Phase 2 resources, routes, methods, schemas, pagination and error semantics. Do not draft a different MVP endpoint list.
+3. **Authentication and identity:** reproduce the owner-approved authentication methods, principal/identity model, credential format and storage, issuance/bootstrap authority, lifetime, renewal, revocation, rotation and replay behavior. Preserve ADR-0002's dynamic extension contract. The optional Vault compatibility surface remains later under ADR-0018.
+4. **Authorization:** reproduce the approved ACL grammar, resources/actions, canonicalization, matching/precedence, policy lifecycle, administrative bootstrap and lockout recovery. Preserve deny-by-default and Community tenant root from trusted server context.
+5. **Rate limiting and request bounds:** reproduce the approved algorithms, quotas/windows/bursts, source identity, trusted-proxy rules, request sizes/timeouts and failure behavior. ADR-0005's pre-auth IP and post-auth identity gates remain mandatory.
+6. **Sealed-mode allowlist:** reproduce the exact approved endpoint and response-field allowlist; do not broaden it.
+7. **TLS certificate lifecycle:** reproduce the approved certificate/key provisioning, trust roots, rotation and reload choices while preserving TLS 1.3/rustls.
+8. **Audit:** reproduce the approved event schema, hash-chain parameters, append durability, sinks, retention, rotation/archive and verification rules while preserving ADR-0005's minimum JSON hash-chain file plus stdout/syslog, 90-day configurable default and fail-closed semantics.
+9. **Audit/state coordination:** reproduce the approved transaction boundary, outbox, idempotency and reconciliation/recovery design.
+10. **Service operations:** reproduce the approved configuration source/format, secret handling, startup validation, health/readiness, graceful shutdown and deployment assumptions, including the existing server distribution requirements in ADR-0022.
 
-A missing reference in the Community adaptation must be resolved by locating/adapting the existing owner-approved source decision. It must not be converted into a fresh owner question by default. If and only if the complete authoritative baseline has no answer or contains a true conflict, isolate that specific gap for owner review.
+A missing reference in the Community adaptation must be resolved by carrying over the existing owner-approved source decision. It must not be converted into a fresh owner question by default. Only if the complete authoritative owner-approved baseline has no answer or contains a genuine conflict should that specific gap be isolated for review. No implementation may substitute a convenient alternative for an existing approval.
 
 ### 2.6 Required test and evidence strategy
 
