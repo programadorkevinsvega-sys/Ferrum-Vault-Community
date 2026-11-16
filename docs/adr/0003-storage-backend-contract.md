@@ -18,3 +18,12 @@ The contract specifies linearizable behavior, limits, cursor semantics, conflict
 ## Security considerations
 
 Protected values are encrypted before reaching this layer; the backend receives ciphertext and required non-secret metadata only. Each adapter must pass the shared conformance suite. An operation that does not meet atomicity or linearizability requirements must not claim those guarantees.
+
+
+## Phase 1.7 implementation record
+
+The Community adapter is implemented in `crates/storage` as `ferrum-storage`, using the redb version pinned in the workspace. It opens the database in multi-writer mode and requests immediate durability for all write transactions. The conformance tests cover versioned CRUD, expected-version/absence preconditions, atomic batches, prefix pagination and cursor binding.
+
+The same adapter implements the Phase 1.6 `NonceUsageLedger`, `RotationStore` and `KeyDependencyInventory` contracts. High-water reservations persist the immutable caller-supplied policy before returning; rotation CAS plus audit and checkpoint plus audit each share one transaction. FBE1 live-record dependency updates are atomic with record writes. Backup, snapshot and in-progress rotation-job references are explicit durable registrations. Key retirement remains fail-closed until a complete external reconciliation is recorded.
+
+The tests verify reopen/recovery behavior, concurrent disjoint reservations, rollback of an uncommitted transaction, cursor properties and rotation persistence. They are not destructive power-loss tests across every target filesystem. Deployment-specific backup/restore and device durability validation remain operational acceptance work.
