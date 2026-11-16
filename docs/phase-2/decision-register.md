@@ -26,6 +26,7 @@
 | Community tenant | Community remains single-tenant; logical tenant is root, derived from trusted authenticated/authorized server context. No client-selected tenant | [ADR-0019](../adr/0019-community-tenant-model.md) |
 | Seal provider | Shamir 2-of-3 is the mandatory default Unsealer. AWS KMS is optional, feature-gated and disabled by default; no silent provider fallback | [ADR-0024](../adr/0024-unsealer-port-and-optional-aws-kms.md) |
 | Compatibility surface | Optional Vault API subset is later, after the native API is stable and legal review is complete; it is not Phase 2's native API | [ADR-0018](../adr/0018-vault-api-compatibility-subset.md) |
+| Administrative UI | MVP does not include a web UI; a later UI uses this same server/API and never replaces server-side controls | [ADR-0021](../adr/0021-user-interface.md) |
 | Verification | Apply unit, property, fuzz, integration, failure-injection, concurrency where appropriate, Miri where applicable, negative-security, E2E, benchmark and interoperability evidence; target 90% measured coverage for crypto, seal, policy, auth and audit | [ADR-0010](../adr/0010-testing-and-security-evidence.md) |
 
 ## 3. Candidate native operation inventory — owner review required
