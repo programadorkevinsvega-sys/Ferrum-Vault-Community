@@ -32,7 +32,7 @@ These components are libraries and contracts, not yet a composed network service
 
 ## Planned service: Phase 2
 
-Phase 2 defines the native versioned /v1 API, TLS 1.3/rustls request pipeline, authentication, deny-by-default authorization and durable fail-closed audit. The request ordering and non-negotiable security invariants are defined in [ADR-0005](adr/0005-request-pipeline-and-fail-closed-audit.md); the API lifecycle is defined in [ADR-0015](adr/0015-reproducible-builds-and-api-versioning.md).
+Phase 2 defines the native versioned /v1 HTTP/JSON API and a gRPC transport, both entering one shared TLS 1.3/rustls request pipeline, authentication, deny-by-default authorization and durable fail-closed audit. This dual-transport choice is approved in [ADR-0025](adr/0025-dual-api-transports-shared-security-pipeline.md). The request ordering and non-negotiable security invariants are defined in [ADR-0005](adr/0005-request-pipeline-and-fail-closed-audit.md); the API lifecycle is defined in [ADR-0015](adr/0015-reproducible-builds-and-api-versioning.md).
 
 The first Phase 2 subphase, 2.0, is a design and owner-approval gate. Its candidate operation catalog, route-security classification, logical interface contracts and unresolved choices are tracked in the [Phase 2.0 decision register](phase-2/decision-register.md). Candidate choices in that register are not approved technical defaults. No Phase 2 server/API runtime is claimed until the implementation subphases have been completed and accepted.
 
