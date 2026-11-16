@@ -292,6 +292,7 @@ paths:
       tags: [Identity]
       parameters:
         - $ref: '#/components/parameters/IdempotencyKey'
+        - $ref: '#/components/parameters/IfMatch'
       requestBody:
         required: true
         content:
@@ -312,6 +313,7 @@ paths:
       tags: [Identity]
       parameters:
         - $ref: '#/components/parameters/IdempotencyKey'
+        - $ref: '#/components/parameters/IfMatch'
       responses:
         '204': { description: Password identity deleted and associated credentials revoked. }
         '401': { $ref: '#/components/responses/Unauthorized' }
@@ -321,6 +323,13 @@ paths:
     get:
       operationId: ListRoles
       tags: [AppRole]
+      parameters:
+        - name: pageSize
+          in: query
+          schema: { type: integer, minimum: 1, maximum: 100, default: 50 }
+        - name: pageToken
+          in: query
+          schema: { type: string, maxLength: 2048 }
       responses:
         '200':
           description: AppRole names and non-secret configuration.
@@ -420,6 +429,13 @@ paths:
     get:
       operationId: ListPolicies
       tags: [Policies]
+      parameters:
+        - name: pageSize
+          in: query
+          schema: { type: integer, minimum: 1, maximum: 100, default: 50 }
+        - name: pageToken
+          in: query
+          schema: { type: string, maxLength: 2048 }
       responses:
         '200':
           description: ACL policy names and revisions.
@@ -697,7 +713,7 @@ components:
       type: object
       required: [bootstrapToken, expiresAt, capabilities]
       properties:
-        bootstrapToken: { type: string, minLength: 48, maxLength: 64, writeOnly: true }
+        bootstrapToken: { type: string, minLength: 48, maxLength: 64 }
         expiresAt: { type: string, format: date-time }
         capabilities:
           type: array
@@ -747,7 +763,7 @@ components:
           type: object
           required: [clientToken, accessor, tokenType, expiresAt, renewable, principalId, policies]
           properties:
-            clientToken: { type: string, writeOnly: true }
+            clientToken: { type: string }
             accessor: { type: string, minLength: 22, maxLength: 22 }
             tokenType: { type: string, const: Bearer }
             expiresAt: { type: string, format: date-time }
@@ -855,6 +871,7 @@ components:
         roles:
           type: array
           items: { $ref: '#/components/schemas/AppRole' }
+        nextPageToken: { type: string, maxLength: 2048 }
       additionalProperties: false
     CreateSecretIdRequest:
       type: object
@@ -866,7 +883,7 @@ components:
       type: object
       required: [secretId, expiresAt, uses]
       properties:
-        secretId: { type: string, writeOnly: true }
+        secretId: { type: string }
         expiresAt: { type: string, format: date-time }
         uses: { type: integer, minimum: 1, maximum: 10 }
       additionalProperties: false
@@ -918,6 +935,7 @@ components:
             properties:
               name: { type: string }
               revision: { type: integer, minimum: 1 }
+        nextPageToken: { type: string, maxLength: 2048 }
       additionalProperties: false
     BeginRootOperationRequest:
       type: object
