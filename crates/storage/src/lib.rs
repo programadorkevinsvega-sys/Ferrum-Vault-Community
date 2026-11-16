@@ -1333,7 +1333,8 @@ mod tests {
                 String::from_utf8_lossy(&output.stdout),
                 String::from_utf8_lossy(&output.stderr)
             );
-            let marker = String::from_utf8_lossy(&output.stdout)
+            let stdout = String::from_utf8_lossy(&output.stdout);
+            let marker = stdout
                 .lines()
                 .find_map(|line| line.split_once("FERRUM_NONCE_RESERVATION="))
                 .map(|(_, value)| value)
