@@ -98,8 +98,7 @@ message BootstrapConsumeResponse {
 message BootstrapCompletionRequest {
   string username = 1;
   string password = 2;
-  string policy_name = 3; // Must be "bootstrap-admin".
-  AclPolicyInput initial_policy = 4; // Exactly one v1 policy, assigned to the first identity.
+  // The server creates and assigns the fixed version-1 bootstrap-admin policy.
 }
 
 message BootstrapCompletionResponse {
