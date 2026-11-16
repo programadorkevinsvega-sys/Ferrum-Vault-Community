@@ -59,7 +59,7 @@ These items remain open and must not be hidden, but they do not make the initial
 - **Independent review:** the solo-owner self-review period is explicitly allowed for Phases 0–2. A qualified independent human reviewer is required before Phase 3; an independent external security audit remains a separate commercial-MVP gate under ADR-0011.
 - **Production-readiness:** passing CI and completing the foundation baseline do not authorize production use and do not imply FIPS validation or an independent security audit.
 
-**Phase 0 closeout status:** the technical repository/governance evidence above is present and the documentation reconciliation in this PR brings the top-level status materials into alignment. Final phase closure remains **pending the owner's explicit acceptance**. Do not begin Phase 2 implementation until that acceptance is recorded.
+**Phase 0 closeout status: ACCEPTED by the owner on 2026-11-16.** The owner expressly accepts the Community Phase 0 foundations and the technical/governance baseline documented above. This acceptance satisfies the Phase 0 entry gate for Phase 2. It does not waive separately recorded legal/name-clearance, confidential vulnerability-intake, pre-Phase-3 independent-review or commercial-MVP external-audit gates. It does not represent production authorization, FIPS validation or an independent security audit.
 
 ## Phase 1 — Seal and encrypted storage
 
@@ -133,7 +133,7 @@ Implement get, put, delete, paginated list(prefix, limit, cursor), atomic txn wi
 
 ## Phase 2 — Native API, authentication, authorization and audit
 
-**Status — planned; formal scope and phase gates documented. No Phase 2 implementation is claimed by this roadmap entry.** This phase turns the Community libraries into a native, versioned service boundary. It implements the request pipeline and security controls already required by [ADR-0005](docs/adr/0005-request-pipeline-and-fail-closed-audit.md), uses the extension rules in [ADR-0002](docs/adr/0002-async-extension-contracts.md), and follows the native API lifecycle in [ADR-0015](docs/adr/0015-reproducible-builds-and-api-versioning.md).
+**Status — Phase 0 entry gate satisfied; Phase 2.0 reconciliation in progress. No Phase 2 implementation is claimed by this roadmap entry.** This phase turns the Community libraries into a native, versioned service boundary. It implements the request pipeline and security controls already required by [ADR-0005](docs/adr/0005-request-pipeline-and-fail-closed-audit.md), uses the extension rules in [ADR-0002](docs/adr/0002-async-extension-contracts.md), and follows the native API lifecycle in [ADR-0015](docs/adr/0015-reproducible-builds-and-api-versioning.md).
 
 ### 2.1 Objective and scope
 
@@ -154,16 +154,16 @@ The phase also establishes the approved API contract, error behavior, server con
 
 **Community boundary:** Community remains single-tenant with the logical tenant identifier `root`; the server must derive this value from authenticated and authorized context and must not accept a freely client-selected tenant. This does not provide cryptographic tenant isolation or introduce multi-tenancy; see [ADR-0019](docs/adr/0019-community-tenant-model.md).
 
-**Explicitly out of scope:** implementing the PKI engine (Phase 3), KV v2 and leases (Phase 4), Transit (Phase 5), encrypted Raft/HA (Phase 6), or the CLI, UI and deployment ecosystem (Phase 10). The optional Vault-API compatibility subset in [ADR-0018](docs/adr/0018-vault-api-compatibility-subset.md) is not the native API and must not be pulled into this phase; it is considered only after the native API is stable and its legal-review condition is satisfied. Phase 2 must not add Community dependencies on the private Enterprise edition.
+**Explicitly out of scope:** implementing the PKI engine (Phase 3), KV v2 and leases (Phase 4), Transit (Phase 5), encrypted Raft/HA (Phase 6), the web UI (deferred under ADR-0021), and later packaging/orchestration channels. The approved CLI distribution starts in Phase 2 with tar.gz/zip for Linux x86_64/aarch64, universal macOS and Windows x86_64 under ADR-0023; later package-manager/OCI CLI channels remain in the delivery-ecosystem phase. The optional Vault-API compatibility subset in [ADR-0018](docs/adr/0018-vault-api-compatibility-subset.md) is not the native API and must not be pulled into this phase; it is considered only after the native API is stable and its legal-review condition is satisfied. Phase 2 must not add Community dependencies on the private Enterprise edition.
 
 ### 2.2 Entry gates and dependencies
 
 The roadmap's phase-sequencing rule remains in force: Phase 2 implementation does not begin until the preceding phase gates have been met and the owner has accepted their reports.
 
-- **Phase 0:** foundations, public workspace/documentation baseline, repository governance and applicable CI Definition of Done must be completed and owner-accepted.
+- **Phase 0:** foundations, public workspace/documentation baseline, repository governance and applicable CI Definition of Done are complete and were explicitly owner-accepted on 2026-11-16. The Phase 0 entry gate is satisfied; separately recorded legal, vulnerability-intake, independent-review and external-audit gates remain in force.
 - **Phase 1:** complete, merged into `main` and owner-accepted. Phase 2 consumes the accepted cryptographic, seal, Unsealer, barrier and storage contracts. The seal controller and durable storage adapter are library-level components; their composition into the running service is Phase 2 work and must preserve the accepted contracts. ADR-0004's numeric parameters remain explicitly pending; obtain owner approval through an ADR before enabling any service path that depends on them. Do not assign defaults or silently bypass these conditions.
 - **Storage and crypto foundations:** the accepted Phase 1.6/1.7 contracts are dependencies for protected state, durable audit coordination and persistence; this does not mean the Phase 2 server itself may store protected plaintext in generic KV.
-- **Design gate 2.0:** the Phase 2 decisions listed below must be approved before their dependent implementation subphases begin.
+- **Design gate 2.0:** reconcile and transcribe the already owner-approved Phase 2 choices into Community contracts before dependent implementation begins. Do not ask the owner to select them again or replace them with new options. A detail missing from an abridged public ADR is a provenance gap, not evidence that the decision was never made.
 - **Edition boundary:** the service must build and operate without Enterprise code, credentials, private packages or services.
 
 Subphase dependencies are sequential where security decisions require it: 2.0 precedes all implementation; 2.1 precedes transport integration; 2.2 establishes the request context and ordered pipeline used by 2.3–2.5; authentication (2.3) precedes identity-based authorization (2.4); the audit contract (2.5) must be integrated before sensitive handlers are enabled; 2.6 validates the complete vertical path. Work may proceed in parallel only where these contracts are already approved and no dependency is bypassed.
@@ -172,7 +172,7 @@ Subphase dependencies are sequential where security decisions require it: 2.0 pr
 
 #### 2.0 — Owner decisions and API/security contract baseline
 
-**Decision register:** [Phase 2.0 owner decision register and contract baseline](docs/phase-2/decision-register.md) consolidates the existing owner-approved architecture into Community ADRs, operation inventory, route-security classifications, logical interfaces, threat impacts and test mapping. The approved model includes HTTP/JSON and gRPC behind one authoritative security pipeline (ADR-0005, clarified in ADR-0025), TLS 1.3/rustls, /v1 versioning, ordered authentication and rate-limit stages, canonical ACL, single tenant root, Shamir 2-of-3 default, and fail-closed durable audit. **Subphase 2.0 is a provenance/reconciliation task, not a request to re-decide this architecture.**
+**Decision register:** [Phase 2.0 approved-design register](docs/phase-2/decision-register.md) and [approved Community design carryover](docs/phase-2/approved-design-carryover.md) consolidate the previously owner-approved architecture into Community operation families, transport contracts, route-security classifications, logical interfaces, threat impacts and test mapping. The approved model includes HTTP/JSON and gRPC behind one authoritative security pipeline (ADR-0005/0025), TLS 1.3/rustls, /v1 versioning, token/AppRole/mTLS/Argon2id-password authentication, pre-auth IP and post-auth identity rate limits, canonical deny-by-default ACL, single tenant root, Shamir 2-of-3 default, independent 2-of-3 root-operation quorum, and durable fail-closed audit. **Subphase 2.0 is a provenance/reconciliation task, not a request to re-decide this architecture.**
 
 **Scope:** consolidate and trace the previously owner-approved architecture decisions, operation catalog and security classifications into the public Community records. Use the complete approved design as the authority; do not reopen decisions because the Community ADR adaptation is concise. Record public interfaces, threat impact and tests. Raise a new ADR only for a demonstrable gap or conflict in the original approved baseline, not as a replacement for an existing decision.
 
@@ -190,7 +190,7 @@ Subphase dependencies are sequential where security decisions require it: 2.0 pr
 **Definition of Done:**
 - Every Phase 2 endpoint has a documented method, canonical route, input/output schema, error behavior and security classification.
 - Each endpoint identifies whether it is available while sealed, which authentication and ACL checks apply, and which audit events are mandatory.
-- The API schema/source of truth and contract-test approach are selected by an owner-approved decision; no schema technology is assumed here.
+- The already approved API schema/source of truth, gRPC IDL/serialization and cross-transport error mapping are transcribed exactly from their owner-approved records. Phase 2.0 does not authorize choosing a replacement or treating a missing public summary as a new owner decision.
 - Versioning and deprecation rules are covered by automated contract tests.
 - Unsupported and deferred endpoints are documented; future Phase 3–6 engines and the optional Vault compatibility surface are not represented as implemented.
 
@@ -208,10 +208,10 @@ Subphase dependencies are sequential where security decisions require it: 2.0 pr
 
 #### 2.3 — Authentication and identity lifecycle
 
-**Scope:** implement the owner-approved authentication method(s), establish a trusted server-side identity context, and apply identity-based rate limiting after authentication. Pluggable authentication methods that require dynamic dispatch follow ADR-0002: async traits with `Send + Sync`; each extension documents errors, cancellation, lifetimes, concurrency and security guarantees.
+**Scope:** implement the owner-approved Community MVP methods: token, AppRole, mTLS client certificate, and username/password with Argon2id password hashing. OIDC, Kubernetes authentication and LDAP are deferred and excluded from this MVP. Establish trusted server-side identity context and apply identity-based rate limiting after authentication. Pluggable authentication methods that require dynamic dispatch follow ADR-0002: async traits with `Send + Sync`; each extension documents errors, cancellation, lifetimes, concurrency and security guarantees.
 
 **Definition of Done:**
-- The approved credential validation and identity lifecycle contract is implemented, including the approved issuance/bootstrap, expiry, renewal, revocation and invalidation behavior where applicable.
+- The four approved MVP methods (token, AppRole, mTLS client certificate and username/password with Argon2id) implement the credential validation and identity lifecycle specified in the owner-approved contracts. Bootstrap token issuance is one-time; approved expiry, renewal, revocation and replay protections are preserved. OIDC, Kubernetes authentication and LDAP are not enabled in the MVP.
 - Unauthenticated, malformed, expired, revoked, replayed and otherwise invalid credentials fail closed and do not reach protected handlers.
 - Identity is produced by the authentication boundary; client-supplied identity or tenant fields cannot override it.
 - Identity-based rate limiting is enforced after successful authentication.
@@ -256,7 +256,7 @@ Subphase dependencies are sequential where security decisions require it: 2.0 pr
 
 ### 2.4 Interface and contract inventory
 
-The following are required contract boundaries. These descriptions identify responsibilities, not final Rust type names, method signatures, wire formats or crate boundaries; those details are selected in 2.0 and recorded in the relevant ADRs.
+The following are required contract boundaries. These descriptions identify responsibilities, not final Rust type names, method signatures, wire formats or crate boundaries; Phase 2.0 must transcribe the previously approved details from their authoritative records and link the relevant Community ADRs. It does not create a new option-selection exercise.
 
 | Boundary | Required contract |
 |---|---|
@@ -282,7 +282,8 @@ The following are required contract boundaries. These descriptions identify resp
 7. **TLS certificate lifecycle:** reproduce the approved certificate/key provisioning, trust roots, rotation and reload choices while preserving TLS 1.3/rustls.
 8. **Audit:** reproduce the approved event schema, hash-chain parameters, append durability, sinks, retention, rotation/archive and verification rules while preserving ADR-0005's minimum JSON hash-chain file plus stdout/syslog, 90-day configurable default and fail-closed semantics.
 9. **Audit/state coordination:** reproduce the approved transaction boundary, outbox, idempotency and reconciliation/recovery design.
-10. **Service operations:** reproduce the approved configuration source/format, secret handling, startup validation, health/readiness, graceful shutdown and deployment assumptions, including the existing server distribution requirements in ADR-0022.
+10. **Service operations:** reproduce the approved configuration source/format, secret handling, startup validation, health/readiness, graceful shutdown and deployment assumptions, including the existing server distribution requirements in ADR-0022. Preserve the ADR-0014 time model: monotonic time for durations, wall-clock time for certificate validity, and documented clock-drift/NTP alert behavior in the relevant phase.
+11. **CLI distribution:** preserve ADR-0023's Phase 2 archive targets and release-verification requirements; do not misclassify CLI archive distribution as Phase 10-only.
 
 A missing reference in the Community adaptation must be resolved by carrying over the existing owner-approved source decision. It must not be converted into a fresh owner question by default. Only if the complete authoritative owner-approved baseline has no answer or contains a genuine conflict should that specific gap be isolated for review. No implementation may substitute a convenient alternative for an existing approval.
 
