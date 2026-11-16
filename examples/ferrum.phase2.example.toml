@@ -72,6 +72,12 @@ bootstrap_token_ttl_seconds = 300
 unseal_session_ttl_seconds = 300
 unseal_active_sessions = 1
 root_operation_session_ttl_seconds = 300
+root_operation_max_active = 1
+
+[ceremony.root_quorum]
+# Required explicitly; this does not change the separate offline recovery threshold.
+threshold = 2
+total_shares = 3
 
 [storage]
 # Must be absolute, owned by the service account, mode 0700 and not a symlink.
