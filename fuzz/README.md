@@ -82,4 +82,4 @@ through native FFI. Reassess both techniques for later pure-Rust stateful compon
 
 ### Durable storage cursor and record decoders
 
-`storage_cursor_decode` feeds arbitrary bytes to the versioned prefix-cursor, live-record and tombstone decoders exposed by `ferrum-storage`. The target runs in PR smoke and scheduled campaigns. Database I/O is intentionally excluded from this byte-decoder target; transaction behavior is exercised by deterministic concurrency, property and recovery tests.
+`storage_cursor_decode` feeds arbitrary bytes to the versioned prefix-cursor, live-record/tombstone, durable nonce-state and rotation-checkpoint decoders exposed by `ferrum-storage`. The target runs in PR smoke and scheduled campaigns. Database I/O is intentionally excluded from this byte-decoder target; transaction behavior is exercised by deterministic concurrency, property and recovery tests.
