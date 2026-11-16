@@ -94,8 +94,6 @@ paths:
         - bootstrapSetupAuth: []
       summary: Atomically create the first identity and initial ACL policy
       description: Available only after unseal and before initialization. Consumes a 15-minute fvst_ setup token once, creates one password identity and one initial ACL policy in one atomic operation, assigns the policy, marks the service initialized and revokes the setup token.
-      parameters:
-        - $ref: '#/components/parameters/IdempotencyKey'
       requestBody:
         required: true
         content:
@@ -820,12 +818,10 @@ components:
       additionalProperties: false
     BootstrapCompletionRequest:
       type: object
-      required: [username, password, policyName, initialPolicy]
+      required: [username, password]
       properties:
         username: { type: string, pattern: '^[a-z0-9][a-z0-9._-]{2,63}$' }
         password: { type: string, minLength: 1, maxLength: 1024, writeOnly: true, description: UTF-8 encoded length must be 12 to 1024 bytes; server validates byte length. }
-        policyName: { type: string, const: bootstrap-admin }
-        initialPolicy: { $ref: '#/components/schemas/AclPolicyInput' }
       additionalProperties: false
     BootstrapCompletionResponse:
       type: object
