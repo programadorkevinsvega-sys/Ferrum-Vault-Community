@@ -325,11 +325,7 @@ impl RedbStore {
         validate_value(envelope)?;
         BarrierEnvelope::decode(envelope).map_err(|_| StorageError::CorruptRecord)?;
         let tx = self.begin_write()?;
-        ensure_key_version_not_retired(
-            &tx,
-            parsed.key_id().as_str(),
-            parsed.key_version(),
-        )?;
+        ensure_key_version_not_retired(&tx, parsed.key_id().as_str(), parsed.key_version())?;
         let records = tx
             .open_table(BARRIER)
             .map_err(|_| StorageError::Unavailable)?;
@@ -840,8 +836,7 @@ impl KeyDependencyInventory for RedbStore {
                 .map_err(|_| KeyInventoryError::Unavailable)?;
         }
         drop(retired);
-        tx.commit()
-            .map_err(|_| KeyInventoryError::Unavailable)?;
+        tx.commit().map_err(|_| KeyInventoryError::Unavailable)?;
         Ok(false)
     }
 }
@@ -1519,14 +1514,16 @@ mod tests {
         let registered = registration.join().unwrap();
         assert_eq!(has_dependencies, registered.is_ok());
         if registered.is_ok() {
-            assert!(store
-                .remove_dependency(
-                    "community/test-key",
-                    91,
-                    DependencyKind::Backup,
-                    b"racing-backup",
-                )
-                .unwrap());
+            assert!(
+                store
+                    .remove_dependency(
+                        "community/test-key",
+                        91,
+                        DependencyKind::Backup,
+                        b"racing-backup",
+                    )
+                    .unwrap()
+            );
         }
         drop(store);
         remove(&file);
