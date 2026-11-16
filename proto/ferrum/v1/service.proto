@@ -18,7 +18,7 @@ service SystemService {
   rpc GetSealStatus(google.protobuf.Empty) returns (SealStatus);
   rpc ConsumeBootstrapToken(BootstrapConsumeRequest) returns (BootstrapConsumeResponse);
   rpc CreateUnsealSession(google.protobuf.Empty) returns (UnsealSession);
-  rpc SubmitUnsealShare(ShareSubmission) returns (ShareProgress);
+  rpc SubmitUnsealShare(ShareSubmission) returns (ShareProgress); // session_id binds the share to the active ceremony.
   rpc Seal(google.protobuf.Empty) returns (google.protobuf.Empty);
 }
 
@@ -100,7 +100,8 @@ message UnsealSession {
 }
 
 message ShareSubmission {
-  bytes share = 1; // One FRS1 share; never logged or persisted.
+  bytes share = 1; // Canonical binary FRS1 envelope; never logged or persisted.
+  string session_id = 2; // Required for SystemService.SubmitUnsealShare.
 }
 
 message ShareProgress {
