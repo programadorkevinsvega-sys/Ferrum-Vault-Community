@@ -230,6 +230,7 @@ dependencies = [
  "ferrum-crypto",
  "ferrum-recovery",
  "ferrum-seal",
+ "ferrum-storage",
  "libfuzzer-sys",
  "rand",
  "rand_core",
@@ -254,6 +255,14 @@ dependencies = [
  "aws-lc-rs",
  "ferrum-recovery",
  "zeroize",
+]
+
+[[package]]
+name = "ferrum-storage"
+version = "0.1.0"
+dependencies = [
+ "ferrum-crypto",
+ "redb",
 ]
 
 [[package]]
@@ -457,6 +466,15 @@ name = "rand_core"
 version = "0.10.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "63b8176103e19a2643978565ca18b50549f6101881c443590420e4dc998a3c69"
+
+[[package]]
+name = "redb"
+version = "4.6.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "096b1dd5ec053c9c2a5a26a93aafeadf73ebcb710ea54dc3151f17a8e20535ef"
+dependencies = [
+ "libc",
+]
 
 [[package]]
 name = "rustversion"
