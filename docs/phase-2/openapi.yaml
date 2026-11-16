@@ -281,6 +281,9 @@ paths:
       responses:
         '200':
           description: Non-secret user metadata.
+          headers:
+            ETag:
+              schema: { type: string }
           content:
             application/json:
               schema: { $ref: '#/components/schemas/PasswordUser' }
@@ -301,6 +304,9 @@ paths:
       responses:
         '200':
           description: Updated non-secret user metadata.
+          headers:
+            ETag:
+              schema: { type: string }
           content:
             application/json:
               schema: { $ref: '#/components/schemas/PasswordUser' }
@@ -320,6 +326,8 @@ paths:
         '401': { $ref: '#/components/responses/Unauthorized' }
         '403': { $ref: '#/components/responses/Forbidden' }
         '404': { $ref: '#/components/responses/NotFound' }
+        '412': { $ref: '#/components/responses/PreconditionFailed' }
+        '428': { $ref: '#/components/responses/PreconditionRequired' }
   /v1/sys/auth/approle/roles:
     get:
       operationId: ListRoles
@@ -368,6 +376,9 @@ paths:
       responses:
         '200':
           description: Non-secret AppRole configuration.
+          headers:
+            ETag:
+              schema: { type: string }
           content:
             application/json:
               schema: { $ref: '#/components/schemas/AppRole' }
@@ -388,6 +399,9 @@ paths:
       responses:
         '200':
           description: AppRole updated.
+          headers:
+            ETag:
+              schema: { type: string }
           content:
             application/json:
               schema: { $ref: '#/components/schemas/AppRole' }
@@ -401,11 +415,14 @@ paths:
       tags: [AppRole]
       parameters:
         - $ref: '#/components/parameters/IdempotencyKey'
+        - $ref: '#/components/parameters/IfMatch'
       responses:
         '204': { description: AppRole and its active Secret IDs revoked. }
         '401': { $ref: '#/components/responses/Unauthorized' }
         '403': { $ref: '#/components/responses/Forbidden' }
         '404': { $ref: '#/components/responses/NotFound' }
+        '412': { $ref: '#/components/responses/PreconditionFailed' }
+        '428': { $ref: '#/components/responses/PreconditionRequired' }
   /v1/sys/auth/approle/roles/{name}/secret-ids:
     post:
       operationId: CreateSecretId
