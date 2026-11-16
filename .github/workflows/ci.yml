@@ -207,7 +207,9 @@ jobs:
           fetch-depth: 0
           persist-credentials: true
       - name: Install pinned Cargo toolchain
-        run: rustup toolchain install 1.100.0 --profile minimal
+        run: |
+          rustup toolchain install 1.100.0 --profile minimal
+          rustup component add rustfmt --toolchain 1.100.0
       - name: Resolve AWS SDK optional feature and export lockfiles
         shell: bash
         run: |
