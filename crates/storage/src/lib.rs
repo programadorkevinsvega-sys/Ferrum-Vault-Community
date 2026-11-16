@@ -28,6 +28,7 @@ const RETIRED_KEYS: TableDefinition<&[u8], &[u8]> = TableDefinition::new("retire
 const META: TableDefinition<&[u8], &[u8]> = TableDefinition::new("storage_meta_v1");
 
 const INVENTORY_COMPLETE: &[u8] = b"inventory-complete";
+const INVENTORY_POLICY_VERSION: &[u8] = b"inventory-policy-version";
 const KV_FBE1_SCAN_COMPLETE: &[u8] = b"kv-fbe1-scan-complete";
 const BARRIER_ENVELOPE_MAGIC: &[u8; 4] = b"FBE1";
 const AUDIT_SEQUENCE: &[u8] = b"audit-sequence";
@@ -269,21 +270,31 @@ impl RedbStore {
         );
 
         let mut meta = tx.open_table(META).map_err(|_| StorageError::Unavailable)?;
-        let inventory_exists = meta
-            .get(INVENTORY_COMPLETE)
+        let inventory_policy_current = meta
+            .get(INVENTORY_POLICY_VERSION)
             .map_err(|_| StorageError::Unavailable)?
-            .is_some();
+            .map(|v| v.value().to_vec())
+            .is_some_and(|version| version == [2]);
+        if !inventory_policy_current {
+            // Older versions inferred completeness from local table contents,
+            // which cannot prove that external backups/snapshots were inventoried.
+            // Require an explicit reconciliation under this policy.
+            meta.insert(INVENTORY_COMPLETE, &[0_u8][..])
+                .map_err(|_| StorageError::Unavailable)?;
+            meta.insert(INVENTORY_POLICY_VERSION, &[2_u8][..])
+                .map_err(|_| StorageError::Unavailable)?;
+        }
+
         let scan_complete = meta
             .get(KV_FBE1_SCAN_COMPLETE)
             .map_err(|_| StorageError::Unavailable)?
             .map(|v| v.value().to_vec())
             .is_some_and(|value| value == [1]);
-        let mut untracked_fbe1 = false;
-
         // One-time migration scan for a prior version that may have persisted
         // FBE1 values through generic KV without updating key dependencies.
-        if !inventory_exists || !scan_complete {
+        if !scan_complete {
             let kv = tx.open_table(KV).map_err(|_| StorageError::Unavailable)?;
+            let mut untracked_fbe1 = false;
             for entry in kv.iter().map_err(|_| StorageError::Unavailable)? {
                 let (_, value) = entry.map_err(|_| StorageError::Unavailable)?;
                 let (_, live) = decode_versioned_record(value.value())?;
@@ -299,21 +310,6 @@ impl RedbStore {
                 meta.insert(INVENTORY_COMPLETE, &[0_u8][..])
                     .map_err(|_| StorageError::Unavailable)?;
             }
-        }
-
-        if !inventory_exists {
-            let records = tx
-                .open_table(BARRIER)
-                .map_err(|_| StorageError::Unavailable)?;
-            let barrier_empty = records.is_empty().map_err(|_| StorageError::Unavailable)?;
-            drop(records);
-            let complete: &[u8] = if barrier_empty && !untracked_fbe1 {
-                &[1]
-            } else {
-                &[0]
-            };
-            meta.insert(INVENTORY_COMPLETE, complete)
-                .map_err(|_| StorageError::Unavailable)?;
         }
         drop(meta);
         tx.commit().map_err(|_| StorageError::Unavailable)
