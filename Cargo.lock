@@ -157,9 +157,9 @@ dependencies = [
 
 [[package]]
 name = "aws-sdk-kms"
-version = "1.129.0"
+version = "1.132.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "5c5cdb29ad25d71c9ee54c408a672c98d90a24a0ea6eb063025483e0e894b411"
+checksum = "96819b38404e0d0ebcd87a5b64b1e0be02aa0bfe5e9a0ed45558e45380b1a915"
 dependencies = [
  "arc-swap",
  "aws-credential-types",
@@ -173,9 +173,7 @@ dependencies = [
  "aws-smithy-schema",
  "aws-smithy-types",
  "aws-types",
- "bytes",
  "fastrand",
- "http 1.5.0",
  "regex-lite",
  "tracing",
 ]
